@@ -1,0 +1,152 @@
+// Generates src/lib/locales.generated.ts from the English dictionary in i18n.tsx.
+// Run with: node scripts/generate-locales.mjs
+import fs from "node:fs";
+import path from "node:path";
+
+const root = path.resolve(import.meta.dirname, "..");
+const i18nPath = path.join(root, "src", "lib", "i18n.tsx");
+const outPath = path.join(root, "src", "lib", "locales.generated.ts");
+const cachePath = path.join(root, "scripts", ".locale-cache.json");
+
+const source = fs.readFileSync(i18nPath, "utf8");
+const startMarker = "const en = {";
+const endMarker = "\ntype Key";
+const start = source.indexOf(startMarker);
+const end = source.indexOf(endMarker);
+if (start === -1 || end === -1) throw new Error("Could not find the English dictionary.");
+const objectSource = source
+  .slice(start + "const en = ".length, end)
+  .trim()
+  .replace(/\s+as const;?$/, "")
+  .replace(/;$/, "");
+const en = new Function(`return (${objectSource});`)();
+
+const keys = Object.keys(en);
+console.log(`English keys: ${keys.length}`);
+
+const SEP = "[[[KTSEP]]]";
+const FALLBACK = { brx: "hi", ks: "ur", mni: "bn" };
+const TARGETS = [
+  "as", "bn", "brx", "doi", "gu", "kn", "ks", "kok", "mai", "ml",
+  "mni", "ne", "or", "pa", "sa", "sat", "sd", "ta", "te", "ur",
+];
+
+const cache = fs.existsSync(cachePath)
+  ? JSON.parse(fs.readFileSync(cachePath, "utf8"))
+  : {};
+
+// English copy that changed after an earlier cached run; retranslate these keys.
+const FORCE_KEYS = [
+  "app.awaitingOwner",
+  "app.ownerConfirmWarning",
+  "app.paymentNotReceipt",
+  "app.confirmWarning",
+];
+for (const language of Object.keys(cache)) {
+  for (const key of FORCE_KEYS) delete cache[language][key];
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function translateText(text, code, attempt = 0) {
+  const url =
+    "https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=en&dt=t&tl=" +
+    code +
+    "&q=" +
+    encodeURIComponent(text);
+  let response;
+  try {
+    response = await fetch(url);
+  } catch (error) {
+    if (attempt < 6) {
+      await sleep(5000 * (attempt + 1));
+      return translateText(text, code, attempt + 1);
+    }
+    throw error;
+  }
+  if (!response.ok) {
+    if (attempt < 6) {
+      console.log(`    retry ${code} ${response.status} in ${10 * (attempt + 1)}s`);
+      await sleep(10000 * (attempt + 1));
+      return translateText(text, code, attempt + 1);
+    }
+    throw new Error(`Translate ${code} failed with ${response.status}`);
+  }
+  const data = await response.json();
+  if (Array.isArray(data) && data.every((part) => typeof part === "string")) {
+    return data.join("");
+  }
+  return (data[0] ?? []).map((part) => part[0] ?? "").join("");
+}
+
+function placeholders(value) {
+  return [...value.matchAll(/\{[a-zA-Z0-9_]+\}/g)].map((match) => match[0]);
+}
+
+async function translateGroup(entries, code) {
+  const text = entries.map(([, value]) => value).join(`\n${SEP}\n`);
+  const translated = await translateText(text, code);
+  const parts = translated.split(new RegExp(`\\s*\\[\\[\\[KTSEP\\]\\]\\]\\s*`));
+  if (parts.length !== entries.length) {
+    if (entries.length === 1) return {};
+    const mid = Math.ceil(entries.length / 2);
+    const left = await translateGroup(entries.slice(0, mid), code);
+    const right = await translateGroup(entries.slice(mid), code);
+    return { ...left, ...right };
+  }
+  const result = {};
+  entries.forEach(([key, value], index) => {
+    const candidate = parts[index].trim();
+    const needed = placeholders(value);
+    const intact = needed.every((token) => candidate.includes(token));
+    result[key] = intact && candidate ? candidate : value;
+  });
+  return result;
+}
+
+async function translateLanguage(code, baseCode) {
+  const existing = cache[code] ?? {};
+  const result = { ...existing };
+  const missing = keys.filter((key) => !(key in result));
+  if (missing.length === 0) return result;
+  const entries = missing.map((key) => [key, en[key]]);
+  const size = 60;
+  for (let index = 0; index < entries.length; index += size) {
+    const batch = entries.slice(index, index + size);
+    const translated = await translateGroup(batch, baseCode);
+    Object.assign(result, translated);
+    cache[code] = result;
+    fs.writeFileSync(cachePath, JSON.stringify(cache, null, 2), "utf8");
+  }
+  return result;
+}
+
+async function mapLimit(items, limit, worker) {
+  const results = {};
+  let cursor = 0;
+  async function run() {
+    while (cursor < items.length) {
+      const index = cursor++;
+      const item = items[index];
+      results[item] = await worker(item);
+      console.log(`  ${item}: ${Object.keys(results[item]).length} strings`);
+    }
+  }
+  await Promise.all(Array.from({ length: limit }, run));
+  return results;
+}
+
+const generated = await mapLimit(TARGETS, 2, (code) =>
+  translateLanguage(code, FALLBACK[code] ?? code),
+);
+
+const header = `// AUTO-GENERATED by scripts/generate-locales.mjs — do not edit by hand.
+// Machine translations for the 22 scheduled Indian languages (English, Hindi and
+// Marathi live in i18n.tsx). Missing or placeholder-broken strings fall back to English.
+import type { Language } from "./types";
+
+export const generatedLocales: Partial<Record<Language, Record<string, string>>> = `;
+
+const body = JSON.stringify(generated, null, 2) + ";\n";
+fs.writeFileSync(outPath, header + body, "utf8");
+console.log(`Wrote ${outPath}`);
