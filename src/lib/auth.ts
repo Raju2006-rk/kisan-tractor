@@ -1,5 +1,9 @@
 import { cookies } from "next/headers";
-import { randomBytes, randomUUID } from "crypto";
+import {
+  createHmac,
+  randomUUID,
+  timingSafeEqual,
+} from "crypto";
 import { mutateDb, getDb } from "./db";
 import type {
   FarmerProfile,
@@ -12,7 +16,86 @@ import type {
 
 export const SESSION_COOKIE = "kt_session";
 const SESSION_DAYS = 7;
+const SESSION_TTL_MS = SESSION_DAYS * 24 * 60 * 60 * 1000;
 export const DEMO_OTP = "123456";
+
+/**
+ * Sessions are signed, self-contained cookies instead of database rows.
+ * Vercel (and other serverless hosts) run each request on an isolated
+ * instance with its own ephemeral filesystem, so a session written during
+ * login is not guaranteed to be readable by the page render that follows.
+ * A signed token keeps login working across instances. Set SESSION_SECRET
+ * in production to replace the demo fallback.
+ */
+const SESSION_SECRET =
+  process.env.SESSION_SECRET ||
+  process.env.AUTH_SECRET ||
+  "kisantractor-demo-session-secret-v1";
+
+type SessionTokenPayload = {
+  userId: string;
+  exp: number;
+  user?: User;
+  farmerProfile?: FarmerProfile;
+  ownerProfile?: OwnerProfile;
+};
+
+function signPayload(payload: string): string {
+  return createHmac("sha256", SESSION_SECRET).update(payload).digest("base64url");
+}
+
+function encodeSessionToken(
+  userId: string,
+  snapshot: Pick<
+    SessionTokenPayload,
+    "user" | "farmerProfile" | "ownerProfile"
+  > = {},
+): string {
+  const payload: SessionTokenPayload = {
+    userId,
+    exp: Date.now() + SESSION_TTL_MS,
+    ...snapshot,
+  };
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${encoded}.${signPayload(encoded)}`;
+}
+
+function decodeSessionToken(token: string): SessionTokenPayload | null {
+  const separator = token.lastIndexOf(".");
+  if (separator <= 0) return null;
+  const encoded = token.slice(0, separator);
+  const signature = token.slice(separator + 1);
+  const expected = signPayload(encoded);
+  const provided = Buffer.from(signature);
+  const wanted = Buffer.from(expected);
+  if (
+    provided.length !== wanted.length ||
+    !timingSafeEqual(provided, wanted)
+  ) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(encoded, "base64url").toString("utf8"),
+    ) as Partial<SessionTokenPayload>;
+    if (
+      typeof parsed.userId !== "string" ||
+      typeof parsed.exp !== "number" ||
+      parsed.exp < Date.now()
+    ) {
+      return null;
+    }
+    return {
+      userId: parsed.userId,
+      exp: parsed.exp,
+      user: parsed.user,
+      farmerProfile: parsed.farmerProfile,
+      ownerProfile: parsed.ownerProfile,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export function normalizeMobile(input: string): string {
   const digits = input.replace(/\D/g, "");
@@ -29,32 +112,57 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
+
   const db = await getDb();
-  const session = db.sessions.find((s) => s.token === token);
-  if (!session) return null;
-  if (new Date(session.expiresAt).getTime() < Date.now()) return null;
-  const user = db.users.find((u) => u.id === session.userId);
+  const decoded = decodeSessionToken(token);
+  let userId = decoded?.userId ?? null;
+
+  if (!userId) {
+    // Backwards compatibility for sessions created before signed cookies.
+    const session = db.sessions.find((s) => s.token === token);
+    if (!session) return null;
+    if (new Date(session.expiresAt).getTime() < Date.now()) return null;
+    userId = session.userId;
+  }
+
+  const user = db.users.find((u) => u.id === userId) ?? decoded?.user;
   if (!user) return null;
-  const farmerProfile = db.farmerProfiles.find((p) => p.userId === user.id);
-  const ownerProfile = db.ownerProfiles.find((p) => p.userId === user.id);
+  const farmerProfile =
+    db.farmerProfiles.find((p) => p.userId === user.id) ??
+    decoded?.farmerProfile;
+  const ownerProfile =
+    db.ownerProfiles.find((p) => p.userId === user.id) ??
+    decoded?.ownerProfile;
   return { ...user, farmerProfile, ownerProfile };
 }
 
 export async function createSession(userId: string): Promise<string> {
-  const token = randomBytes(32).toString("hex");
-  const expiresAt = new Date(
-    Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000,
-  ).toISOString();
-  await mutateDb((db) => {
-    db.sessions = db.sessions.filter(
-      (s) => new Date(s.expiresAt).getTime() > Date.now(),
-    );
-    db.sessions.push({
-      token,
-      userId,
-      createdAt: new Date().toISOString(),
-      expiresAt,
-    });
+  const db = await getDb();
+  const user = db.users.find((u) => u.id === userId);
+  if (!user) {
+    throw new Error("Cannot create a session for an unknown user.");
+  }
+  const farmerProfile = db.farmerProfiles.find((p) => p.userId === userId);
+  const ownerProfile = db.ownerProfiles.find((p) => p.userId === userId);
+  const token = encodeSessionToken(userId, {
+    // Keep the cookie small: uploaded photos and QR images are not echoed back.
+    user: { ...user, profilePhoto: null },
+    farmerProfile: farmerProfile
+      ? { ...farmerProfile, documents: undefined }
+      : undefined,
+    ownerProfile: ownerProfile
+      ? {
+          ...ownerProfile,
+          documents: undefined,
+          payment: {
+            ...ownerProfile.payment,
+            upiId: "",
+            qrImage: "",
+            bankAccountNumber: "",
+            bankIfsc: "",
+          },
+        }
+      : undefined,
   });
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, {
@@ -69,12 +177,6 @@ export async function createSession(userId: string): Promise<string> {
 
 export async function destroySession(): Promise<void> {
   const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
-  if (token) {
-    await mutateDb((db) => {
-      db.sessions = db.sessions.filter((s) => s.token !== token);
-    });
-  }
   jar.delete(SESSION_COOKIE);
 }
 
