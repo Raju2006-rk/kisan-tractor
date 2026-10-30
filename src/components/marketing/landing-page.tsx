@@ -404,7 +404,7 @@ function Services() {
   );
 }
 
-function TractorCard({ tractor }: { tractor: TractorWithOwner }) {
+function TractorCard({ tractor, priority = false }: { tractor: TractorWithOwner; priority?: boolean }) {
   const rates = [
     tractor.pricing.hourlyEnabled && {
       label: "Hourly",
@@ -435,6 +435,7 @@ function TractorCard({ tractor }: { tractor: TractorWithOwner }) {
           className="h-48 w-full"
           imageClassName="transition duration-700 group-hover:scale-105"
           sizes="(max-width: 768px) 100vw, 33vw"
+          priority={priority}
         />
         <div className="absolute left-3 top-3 flex gap-1.5">
           <Badge tone="green" dot>
@@ -479,7 +480,8 @@ function TractorCard({ tractor }: { tractor: TractorWithOwner }) {
 function NearbyTractors() {
   const { t } = useI18n();
   const { data, isLoading } = useSWR<{ tractors: TractorWithOwner[] }>(
-    "/api/tractors?lat=19.9975&lng=73.7898",
+    // Niphad, Nashik — the seed service area shown in the section heading.
+    "/api/tractors?lat=20.0833&lng=73.9333",
   );
   const tractors = data?.tractors?.slice(0, 3) ?? [];
 
@@ -501,8 +503,8 @@ function NearbyTractors() {
             ? [0, 1, 2].map((item) => (
                 <div key={item} className="h-80 animate-pulse rounded-[1.5rem] bg-sand/70" />
               ))
-            : tractors.map((tractor) => (
-                <TractorCard key={tractor.id} tractor={tractor} />
+            : tractors.map((tractor, index) => (
+                <TractorCard key={tractor.id} tractor={tractor} priority={index === 0} />
               ))}
         </div>
         <p className="mt-4 text-center text-[0.7rem] text-stone">

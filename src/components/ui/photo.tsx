@@ -19,6 +19,7 @@ export function Photo({
   className?: string;
   imageClassName?: string;
   sizes?: string;
+  /** Above-the-fold/LCP image: loads eagerly with high fetch priority. */
   priority?: boolean;
   overlay?: boolean;
 }) {
@@ -33,7 +34,8 @@ export function Photo({
           alt={alt}
           fill
           sizes={sizes}
-          priority={priority}
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "auto"}
           onError={() => setFailed(true)}
           className={cn("object-cover", imageClassName)}
         />

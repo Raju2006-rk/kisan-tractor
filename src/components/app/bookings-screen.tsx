@@ -281,12 +281,13 @@ export function BookingsScreen({ role }: { role: Role }) {
         />
       ) : (
         <div className="space-y-3">
-          {visible.map((booking) => (
+          {visible.map((booking, index) => (
             <BookingCard
               key={booking.id}
               booking={booking}
               role={role}
               showActions
+              priority={index === 0}
               onUpdated={() => mutate()}
             />
           ))}

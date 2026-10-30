@@ -57,7 +57,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const direction = RTL_LANGUAGES.includes(initialLanguage) ? "rtl" : "ltr";
 
   return (
-    <html lang={initialLanguage} dir={direction} suppressHydrationWarning>
+    <html
+      lang={initialLanguage}
+      dir={direction}
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+    >
       <body
         className={`${fraunces.variable} ${manrope.variable} ${devanagari.variable} antialiased`}
       >

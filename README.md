@@ -1,8 +1,23 @@
 # KisanTractor
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Raju2006-rk/kisan-tractor)
+
 A mobile-first marketplace that connects farmers in Nashik, Maharashtra with nearby tractor owners. Farmers search local tractors, book one for themselves or someone else, and pay the owner **directly**. KisanTractor holds no money and takes no commission.
 
 The product includes a 3D scrolling landing page, OTP login, separate farmer and owner dashboards, tractor listings with equipment and rates, a multi-step booking flow, a full booking lifecycle with work tracking, automatic final billing, owner-marked direct payments, live farmer GPS tracking for the owner, disputes, notifications, and all 22 scheduled Indian languages.
+
+---
+
+## 🚀 Live Deployment Guide
+
+KisanTractor is a **full-stack Next.js 16 application** featuring server-side API routes, dynamic cookies, and backend persistence.
+
+> **Note on GitHub Pages:** GitHub Pages is a static file host (HTML/CSS only) and cannot run Node.js servers or Next.js backend API routes. For free, seamless hosting with 100% full-stack support, deploy to **Vercel** (the creators of Next.js).
+
+### Deploy in 60 Seconds on Vercel (Free)
+1. Click the button above or visit [vercel.com](https://vercel.com).
+2. Sign in with GitHub and select the **`Raju2006-rk/kisan-tractor`** repository.
+3. Click **Deploy**. Vercel will automatically build and launch the live site with working API endpoints and database functionality.
 
 ---
 

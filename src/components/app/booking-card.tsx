@@ -16,12 +16,14 @@ export function BookingCard({
   role,
   showActions = false,
   compact = false,
+  priority = false,
   onUpdated,
 }: {
   booking: BookingDetail;
   role: Role;
   showActions?: boolean;
   compact?: boolean;
+  priority?: boolean;
   onUpdated?: (booking: BookingDetail) => void;
 }) {
   const { t, serviceLabel } = useI18n();
@@ -49,6 +51,7 @@ export function BookingCard({
             compact && "h-24 sm:h-24 sm:w-28",
           )}
           sizes="150px"
+          priority={priority}
         />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">

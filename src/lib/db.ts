@@ -1,4 +1,5 @@
 import { promises as fs } from "fs";
+import os from "os";
 import path from "path";
 import { buildSeedDatabase } from "./seed";
 import type { Database } from "./types";
@@ -8,7 +9,16 @@ const globalForDb = globalThis as unknown as {
   __ktQueue?: Promise<unknown>;
 };
 
-const dataDir = path.join(process.cwd(), "data");
+// In serverless environments like Vercel, the workspace root is read-only.
+// We fallback to os.tmpdir() in production/serverless environments.
+const isServerless =
+  Boolean(process.env.VERCEL) ||
+  Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+  process.env.NODE_ENV === "production";
+
+const dataDir = isServerless
+  ? path.join(os.tmpdir(), "kisantractor-data")
+  : path.join(process.cwd(), "data");
 const dbFile = path.join(dataDir, "db.json");
 
 async function writeDatabase(db: Database) {

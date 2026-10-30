@@ -650,6 +650,7 @@ export function BookingWizard({
                   alt={`${selectedTractor.brand} ${selectedTractor.model}`}
                   className="h-16 w-20 shrink-0 rounded-xl"
                   sizes="90px"
+                  priority
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-display text-lg text-forest">

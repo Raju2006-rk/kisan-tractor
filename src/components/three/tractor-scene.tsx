@@ -206,7 +206,7 @@ export default function TractorScene() {
   return (
     <Canvas
       dpr={[1, 1.75]}
-      shadows
+      shadows="percentage"
       camera={{ position: [5.4, 3.3, 6.4], fov: 36 }}
       gl={{ antialias: true, alpha: true }}
       style={{ touchAction: "pan-y" }}
