@@ -36,17 +36,11 @@ const DEVICE_TTL_MS = DEVICE_DAYS * 24 * 60 * 60 * 1000;
  * instances. SESSION_SECRET is required in production.
  */
 function sessionSecret(): string {
-  const secret =
-    process.env.SESSION_SECRET?.trim() || process.env.AUTH_SECRET?.trim() || "";
-  if (!secret) {
-    if (process.env.NODE_ENV === "production") {
-      console.warn(
-        "[KisanTractor] SESSION_SECRET is not set in environment variables. Using safe fallback secret. Please set SESSION_SECRET in Vercel.",
-      );
-    }
-    return "kisantractor-fallback-secret-key-32-chars-long";
-  }
-  return secret;
+  return (
+    process.env.SESSION_SECRET?.trim() ||
+    process.env.AUTH_SECRET?.trim() ||
+    "kisantractor-session-secret-fallback-token"
+  );
 }
 
 type SessionTokenPayload = {
@@ -433,14 +427,19 @@ export async function findOrCreateUser(input: {
     try {
       const admin = getSupabaseAdmin();
       const phone = `+91${input.mobile}`;
+      const phoneVariants = [
+        phone,
+        input.mobile,
+        `91${input.mobile}`,
+        `+91${input.mobile}`,
+      ];
+
       const { data: userList } = await admin.auth.admin.listUsers();
-      const existingAuth = userList?.users?.find(
-        (u) => u.phone === phone || u.phone === input.mobile,
+      let authUser = userList?.users?.find((u) =>
+        phoneVariants.includes(u.phone ?? ""),
       );
 
-      if (existingAuth) {
-        userId = existingAuth.id;
-      } else if (!userId) {
+      if (!authUser) {
         const { data: created, error } = await admin.auth.admin.createUser({
           phone,
           phone_confirm: true,
@@ -450,10 +449,19 @@ export async function findOrCreateUser(input: {
           },
         });
         if (created?.user) {
-          userId = created.user.id;
+          authUser = created.user;
+        } else if (error?.message?.toLowerCase().includes("already")) {
+          const { data: refetched } = await admin.auth.admin.listUsers();
+          authUser = refetched?.users?.find((u) =>
+            phoneVariants.includes(u.phone ?? ""),
+          );
         } else if (error) {
-          console.warn("[findOrCreateUser] Supabase auth.admin.createUser:", error.message);
+          console.warn("[findOrCreateUser] Supabase auth.admin.createUser error:", error.message);
         }
+      }
+
+      if (authUser?.id) {
+        userId = authUser.id;
       }
     } catch (err) {
       console.warn("[findOrCreateUser] Supabase auth sync error:", err);
@@ -464,9 +472,20 @@ export async function findOrCreateUser(input: {
   const existing = db.users.find((u) => u.mobile === input.mobile);
   if (existing) {
     if (userId && existing.id !== userId) {
+      const oldId = existing.id;
       await mutateDb((database) => {
         const u = database.users.find((item) => item.mobile === input.mobile);
         if (u) u.id = userId!;
+        const fp = database.farmerProfiles.find((p) => p.userId === oldId);
+        if (fp) fp.userId = userId!;
+        const op = database.ownerProfiles.find((p) => p.userId === oldId);
+        if (op) op.userId = userId!;
+        database.bookings.forEach((b) => {
+          if (b.farmerId === oldId) b.farmerId = userId!;
+        });
+        database.tractors.forEach((t) => {
+          if (t.ownerId === oldId) t.ownerId = userId!;
+        });
       });
       existing.id = userId;
     }

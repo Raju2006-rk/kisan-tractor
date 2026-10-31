@@ -1,6 +1,6 @@
 # KisanTractor
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Raju2006-rk/kisan-tractor)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Raju2006-rk/kisan-tractor&env=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,SESSION_SECRET)
 
 A mobile-first marketplace that connects farmers in Nashik, Maharashtra with nearby tractor owners. Farmers search local tractors, book one for themselves or someone else, and pay the owner **directly**. KisanTractor holds no money and takes no commission.
 

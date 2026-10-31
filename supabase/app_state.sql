@@ -21,11 +21,37 @@ alter table public.app_state enable row level security;
 revoke all on public.app_state from anon, authenticated;
 grant all on public.app_state to service_role;
 
--- The server creates the "main" row on first use. This insert makes the row
--- available immediately after running the migration.
+-- Initial document state with empty arrays and default catalog equipment.
+-- If the row already exists with '{}', update it to the proper initial schema.
 insert into public.app_state (id, data, version)
-values ('main', '{}'::jsonb, 1)
-on conflict (id) do nothing;
+values (
+  'main',
+  '{
+    "users": [],
+    "farmerProfiles": [],
+    "ownerProfiles": [],
+    "tractors": [],
+    "pricing": [],
+    "bookings": [],
+    "workSessions": [],
+    "workMeasurements": [],
+    "paymentRecords": [],
+    "bookingStatusHistory": [],
+    "notifications": [],
+    "disputes": [],
+    "sessions": [],
+    "otpChallenges": [],
+    "equipment": [
+      { "id": "eq_plough", "name": "Plough", "description": "Deep soil turning and primary tillage", "icon": "plough" },
+      { "id": "eq_rotavator", "name": "Rotavator", "description": "Secondary seedbed preparation and fine pulverising", "icon": "rotavator" },
+      { "id": "eq_trolley", "name": "Trolley / Trailer", "description": "Crop hauling, manure transport and heavy farm logistics", "icon": "trolley" }
+    ]
+  }'::jsonb,
+  1
+)
+on conflict (id) do update
+set data = excluded.data
+where app_state.data = '{}'::jsonb or app_state.data is null;
 
 comment on table public.app_state is
   'Single-row document store for the KisanTractor server. Service role only.';

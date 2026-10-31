@@ -4,7 +4,10 @@ let adminClient: SupabaseClient | null = null;
 let authClient: SupabaseClient | null = null;
 
 function supabaseUrl() {
-  return process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "";
+  return (
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
+    "https://kahodyxqigybqaitngvm.supabase.co"
+  );
 }
 
 function anonKey() {
