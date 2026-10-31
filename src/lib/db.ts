@@ -1,4 +1,5 @@
 import { promises as fs } from "fs";
+import os from "os";
 import path from "path";
 import { buildInitialDatabase } from "./initial-db";
 import { getSupabaseAdmin, isSupabaseDatabaseConfigured } from "./supabase";
@@ -12,7 +13,14 @@ const globalForDb = globalThis as unknown as {
   __ktQueue?: Promise<unknown>;
 };
 
-const dataDir = path.join(process.cwd(), "data");
+const isServerless =
+  Boolean(process.env.VERCEL) ||
+  Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+  process.env.NODE_ENV === "production";
+
+const dataDir = isServerless
+  ? path.join(os.tmpdir(), "kisantractor-data")
+  : path.join(process.cwd(), "data");
 const dbFile = path.join(dataDir, "db.json");
 
 function normalizeDatabase(value: unknown): Database {
@@ -56,7 +64,7 @@ async function loadLocalDatabase(): Promise<Database> {
   return globalForDb.__ktDb;
 }
 
-async function readSupabaseState(): Promise<{ db: Database; version: number }> {
+async function readSupabaseState(): Promise<{ db: Database; version: number } | null> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("app_state")
@@ -65,6 +73,12 @@ async function readSupabaseState(): Promise<{ db: Database; version: number }> {
     .maybeSingle();
 
   if (error) {
+    if (error.code === "PGRST205") {
+      console.warn(
+        "[KisanTractor] Supabase table 'app_state' not found. Run supabase/app_state.sql in the Supabase SQL editor. Using local fallback.",
+      );
+      return null;
+    }
     throw new Error(
       `Could not read the Supabase app_state table (${error.message}). Run supabase/app_state.sql in the SQL editor.`,
     );
@@ -118,8 +132,12 @@ async function writeSupabaseState(
 export async function getDb(): Promise<Database> {
   assertDatabaseConfigured();
   if (isSupabaseDatabaseConfigured()) {
-    const { db } = await readSupabaseState();
-    return db;
+    try {
+      const state = await readSupabaseState();
+      if (state) return state.db;
+    } catch (err) {
+      console.warn("[KisanTractor] Supabase read error, using local fallback:", err);
+    }
   }
   return loadLocalDatabase();
 }
@@ -130,15 +148,22 @@ export async function mutateDb<T>(
   assertDatabaseConfigured();
 
   if (isSupabaseDatabaseConfigured()) {
-    for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt++) {
-      const { db, version } = await readSupabaseState();
-      const draft = structuredClone(db);
-      const result = await mutator(draft);
-      if (await writeSupabaseState(draft, version)) return result;
+    try {
+      const state = await readSupabaseState();
+      if (state) {
+        for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt++) {
+          const fresh = (await readSupabaseState()) || state;
+          const draft = structuredClone(fresh.db);
+          const result = await mutator(draft);
+          if (await writeSupabaseState(draft, fresh.version)) return result;
+        }
+        throw new Error(
+          "The database changed while saving. Please try again.",
+        );
+      }
+    } catch (err) {
+      console.warn("[KisanTractor] Supabase mutate error, using local fallback:", err);
     }
-    throw new Error(
-      "The database changed while saving. Please try again.",
-    );
   }
 
   const previous = globalForDb.__ktQueue ?? Promise.resolve();
