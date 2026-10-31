@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import "leaflet/dist/leaflet.css";
 import type { Map as LeafletMap, Marker } from "leaflet";
 import type { LiveLocation } from "@/lib/types";
 

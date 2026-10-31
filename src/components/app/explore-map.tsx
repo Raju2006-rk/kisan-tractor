@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import "leaflet/dist/leaflet.css";
 import type { Map as LeafletMap } from "leaflet";
 import { useI18n } from "@/lib/i18n";
 import { formatRupees } from "@/lib/pricing";

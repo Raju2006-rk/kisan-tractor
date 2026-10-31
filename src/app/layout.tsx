@@ -63,6 +63,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       data-scroll-behavior="smooth"
       suppressHydrationWarning
     >
+      <head>
+        <link rel="stylesheet" href="/leaflet.css" />
+      </head>
       <body
         className={`${fraunces.variable} ${manrope.variable} ${devanagari.variable} antialiased`}
       >
