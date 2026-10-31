@@ -365,7 +365,10 @@ export function Alert({
     danger: "border-clay/25 bg-clay/8 text-clay-dark",
   };
   return (
-    <div className={cn("rounded-2xl border px-4 py-3.5 text-xs leading-relaxed", tones[tone], className)}>
+    <div
+      role={tone === "danger" || tone === "warning" ? "alert" : "status"}
+      className={cn("rounded-2xl border px-4 py-3.5 text-xs leading-relaxed", tones[tone], className)}
+    >
       {title ? <p className="mb-1 text-[0.8rem] font-bold">{title}</p> : null}
       {children}
     </div>

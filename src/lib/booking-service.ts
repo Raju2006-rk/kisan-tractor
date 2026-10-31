@@ -1359,7 +1359,10 @@ export async function updateUserProfile(
         }
         profile.lng = input.lng;
       }
-      if (input.documents) {
+      // Document verification is an owner-only feature. Ignore the field for
+      // farmers so a stale client or direct API call cannot store documents on
+      // a farmer profile.
+      if (input.documents && ownerProfile) {
         const docs: UserDocuments = profile.documents ?? {
           dlStatus: "not_provided",
           rcStatus: "not_provided",

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { refreshSession } from "@/lib/auth";
 import { updateUserProfile } from "@/lib/booking-service";
 import { handleApiError, readJson, requireUser } from "@/lib/http";
 import type { Language } from "@/lib/types";
@@ -21,6 +22,7 @@ export async function PATCH(request: Request) {
       };
     }>(request);
     const updated = await updateUserProfile(user.id, body);
+    await refreshSession(user.id);
     return NextResponse.json({ user: updated });
   } catch (error) {
     return handleApiError(error);

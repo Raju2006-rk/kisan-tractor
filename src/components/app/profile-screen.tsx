@@ -49,6 +49,9 @@ function nearestVillage(lat: number, lng: number) {
   }, { village: VILLAGES[0], distance: Number.POSITIVE_INFINITY });
 }
 
+/** How far a GPS reading may be from a seeded village and still be saved. */
+const SERVICE_AREA_KM = 50;
+
 export function ProfileScreen({ user }: { user: SessionUser }) {
   const { t, language, setLanguage, roleLabel } = useI18n();
   const { push } = useToast();
@@ -68,6 +71,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
   }));
   const [locating, setLocating] = useState(false);
   const [locationNote, setLocationNote] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -94,19 +98,29 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
 
   function chooseVillage(name: string) {
     setVillage(name);
+    setLocationNote(null);
+    setLocationError(null);
     const match = VILLAGES.find(
       (item) => item.name.toLowerCase() === name.trim().toLowerCase(),
     );
     if (match) {
       setCoords({ lat: match.lat, lng: match.lng });
-      setLocationNote(null);
     }
   }
 
   function useMyLocation() {
-    setError(null);
+    setLocationError(null);
+    setLocationNote(null);
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setLocationError(
+        "Location detection needs a secure https connection. Open this site over https, or type your village manually.",
+      );
+      return;
+    }
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setError("Your browser cannot detect location. Choose your village instead.");
+      setLocationError(
+        "This browser cannot detect location. Type your village name manually.",
+      );
       return;
     }
     setLocating(true);
@@ -115,19 +129,35 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
         const lat = Math.round(position.coords.latitude * 10000) / 10000;
         const lng = Math.round(position.coords.longitude * 10000) / 10000;
         const match = nearestVillage(lat, lng);
-        setCoords({ lat, lng });
-        setVillage(match.village.name);
-        setLocationNote(
-          `Detected near ${match.village.name} (${match.distance.toFixed(1)} km from the village centre).`,
+        setLocating(false);
+        // Only snap to a seeded village when the reading is inside the
+        // supported service area. Farther readings are reported but not saved,
+        // so a farmer outside Nashik keeps a usable saved village.
+        if (match.distance <= SERVICE_AREA_KM) {
+          setCoords({ lat, lng });
+          setVillage(match.village.name);
+          setLocationNote(
+            `Found you near ${match.village.name} (${match.distance.toFixed(1)} km from the village centre). Tap Save to keep it.`,
+          );
+          push("Location detected from your device.", "success");
+        } else {
+          setLocationNote(
+            `Your device is ${Math.round(match.distance)} km from ${match.village.name}, outside the KisanTractor service area. Your saved village stays "${village}".`,
+          );
+          push("Detected a location outside the service area.", "error");
+        }
+      },
+      (positionError) => {
+        setLocating(false);
+        setLocationError(
+          positionError.code === positionError.PERMISSION_DENIED
+            ? "Location permission is blocked. Allow location for this site in your browser settings, or type your village manually."
+            : positionError.code === positionError.TIMEOUT
+              ? "Location took too long. Try again near a window or outdoors, or type your village manually."
+              : "Could not read your location. Try again, or type your village manually.",
         );
-        setLocating(false);
-        push("Location detected from your device.", "success");
       },
-      () => {
-        setLocating(false);
-        setError("Location permission was not given. Choose your village instead.");
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
     );
   }
 
@@ -151,7 +181,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
       setError("Enter your village name.");
       return;
     }
-    if (rcNumber.trim() && !rcNumberValid) {
+    if (isOwner && rcNumber.trim() && !rcNumberValid) {
       setSaving(false);
       setError("Enter a valid RC number, for example MH 15 AB 1234, or upload the RC photo.");
       return;
@@ -166,12 +196,16 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
           address: address.trim(),
           lat: coords.lat,
           lng: coords.lng,
-          documents: {
-            dlPhoto: dlPhoto || null,
-            rcNumber: rcNumber.trim() || null,
-            rcPhoto: rcPhoto || null,
-          },
-          ...(isOwner ? { serviceRadiusKm: Number(serviceRadiusKm) || 10 } : {}),
+          ...(isOwner
+            ? {
+                serviceRadiusKm: Number(serviceRadiusKm) || 10,
+                documents: {
+                  dlPhoto: dlPhoto || null,
+                  rcNumber: rcNumber.trim() || null,
+                  rcPhoto: rcPhoto || null,
+                },
+              }
+            : {}),
         }),
       });
       const result = (await response.json()) as { error?: string };
@@ -330,9 +364,20 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                         <LocateFixed className="size-3.5" /> Use my current location
                       </Button>
                     </div>
+                    {locationError ? (
+                      <p
+                        role="alert"
+                        className="mt-2 rounded-xl border border-clay/25 bg-clay/8 px-2.5 py-2 text-[0.65rem] leading-relaxed text-clay-dark"
+                      >
+                        {locationError}
+                      </p>
+                    ) : null}
                     {locationNote ? (
-                      <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-forest/8 px-2.5 py-1 text-[0.62rem] font-semibold text-forest">
-                        <LocateFixed className="size-3" /> {locationNote}
+                      <p
+                        role="status"
+                        className="mt-2 inline-flex items-start gap-1.5 rounded-xl bg-forest/8 px-2.5 py-1.5 text-[0.62rem] font-semibold leading-relaxed text-forest"
+                      >
+                        <LocateFixed className="mt-0.5 size-3 shrink-0" /> {locationNote}
                       </p>
                     ) : null}
                     <p className="mt-2 text-[0.6rem] text-stone">
@@ -381,196 +426,198 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-line/80 bg-cream/30 p-4">
-                <button
-                  type="button"
-                  onClick={() => setDocsOpen((open) => !open)}
-                  aria-expanded={docsOpen}
-                  aria-controls="profile-documents"
-                  className="flex w-full items-start justify-between gap-3 text-left"
-                >
-                  <div className="flex min-w-0 items-start gap-2.5">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-forest/8 text-forest">
-                      <FileCheck className="size-4" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-forest">Documents & verification</p>
-                      <p className="mt-0.5 text-[0.65rem] leading-relaxed text-stone">
-                        Add your driving licence if you have one, and your vehicle RC number or RC
-                        photo. Documents are optional and can be added later.
-                      </p>
+              {isOwner ? (
+                <div className="rounded-2xl border border-line/80 bg-cream/30 p-4">
+                  <button
+                    type="button"
+                    onClick={() => setDocsOpen((open) => !open)}
+                    aria-expanded={docsOpen}
+                    aria-controls="profile-documents"
+                    className="flex w-full items-start justify-between gap-3 text-left"
+                  >
+                    <div className="flex min-w-0 items-start gap-2.5">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-forest/8 text-forest">
+                        <FileCheck className="size-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-forest">Documents & verification</p>
+                        <p className="mt-0.5 text-[0.65rem] leading-relaxed text-stone">
+                          Add your driving licence if you have one, and your vehicle RC number or RC
+                          photo. Documents are optional and can be added later.
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Badge tone={documentsVerified ? "green" : "stone"} dot>
-                      {documentsVerified ? "Verified" : "Not added"}
-                    </Badge>
-                    <ChevronDown
-                      className={cn(
-                        "size-4 shrink-0 text-stone transition-transform",
-                        docsOpen && "rotate-180",
-                      )}
-                    />
-                  </div>
-                </button>
-
-                {docsOpen ? (
-                  <div id="profile-documents" className="mt-3">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-xl border border-line bg-paper p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="flex items-center gap-1.5 text-xs font-semibold text-forest">
-                            <IdCard className="size-3.5" /> Driving licence
-                          </p>
-                          <Badge tone={dlVerified ? "green" : "stone"}>
-                            {dlVerified ? "Verified" : "Optional"}
-                          </Badge>
-                        </div>
-                        {dlPhoto ? (
-                          <Photo
-                            src={dlPhoto}
-                            alt="Driving licence"
-                            className="mt-2 h-28 w-full rounded-lg border border-line"
-                            sizes="(max-width: 640px) 100vw, 320px"
-                          />
-                        ) : (
-                          <div className="mt-2 flex h-28 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line bg-cream/40 text-stone">
-                            <IdCard className="size-6 text-forest/40" />
-                            <p className="text-[0.62rem]">No DL added</p>
-                          </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Badge tone={documentsVerified ? "green" : "stone"} dot>
+                        {documentsVerified ? "Verified" : "Not added"}
+                      </Badge>
+                      <ChevronDown
+                        className={cn(
+                          "size-4 shrink-0 text-stone transition-transform",
+                          docsOpen && "rotate-180",
                         )}
-                        <input
-                          ref={dlInputRef}
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp,image/avif"
-                          className="hidden"
-                          onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            if (file) void uploadDocument("dl", file);
-                          }}
-                        />
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            loading={uploadingDoc === "dl"}
-                            disabled={uploadingDoc !== null}
-                            onClick={() => dlInputRef.current?.click()}
-                          >
-                            <Upload className="size-3.5" /> {dlPhoto ? "Replace DL" : "Upload DL"}
-                          </Button>
+                      />
+                    </div>
+                  </button>
+
+                  {docsOpen ? (
+                    <div id="profile-documents" className="mt-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-xl border border-line bg-paper p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="flex items-center gap-1.5 text-xs font-semibold text-forest">
+                              <IdCard className="size-3.5" /> Driving licence
+                            </p>
+                            <Badge tone={dlVerified ? "green" : "stone"}>
+                              {dlVerified ? "Verified" : "Optional"}
+                            </Badge>
+                          </div>
                           {dlPhoto ? (
+                            <Photo
+                              src={dlPhoto}
+                              alt="Driving licence"
+                              className="mt-2 h-28 w-full rounded-lg border border-line"
+                              sizes="(max-width: 640px) 100vw, 320px"
+                            />
+                          ) : (
+                            <div className="mt-2 flex h-28 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line bg-cream/40 text-stone">
+                              <IdCard className="size-6 text-forest/40" />
+                              <p className="text-[0.62rem]">No DL added</p>
+                            </div>
+                          )}
+                          <input
+                            ref={dlInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/avif"
+                            className="hidden"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              if (file) void uploadDocument("dl", file);
+                            }}
+                          />
+                          <div className="mt-2 flex flex-wrap gap-1.5">
                             <Button
                               type="button"
-                              variant="ghost"
+                              variant="secondary"
                               size="sm"
+                              loading={uploadingDoc === "dl"}
                               disabled={uploadingDoc !== null}
-                              onClick={() => removeDocument("dl")}
+                              onClick={() => dlInputRef.current?.click()}
                             >
-                              <Trash className="size-3.5" /> Remove
+                              <Upload className="size-3.5" /> {dlPhoto ? "Replace DL" : "Upload DL"}
                             </Button>
-                          ) : null}
-                    </div>
-                    <p className="mt-1.5 text-[0.6rem] leading-relaxed text-stone">
-                      If you do not have a driving licence, leave this empty. It is not required.
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl border border-line bg-paper p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="flex items-center gap-1.5 text-xs font-semibold text-forest">
-                        <FileCheck className="size-3.5" /> Vehicle RC
-                      </p>
-                      <Badge tone={rcVerified ? "green" : "stone"}>
-                        {rcVerified ? "Verified" : "Not added"}
-                      </Badge>
-                    </div>
-                    <Field
-                      label="RC number"
-                      className="mt-2"
-                      hint="Type the number printed on the RC paper."
-                    >
-                      <Input
-                        value={rcNumber}
-                        onChange={(event) => {
-                          setRcNumber(event.target.value.toUpperCase());
-                          setSaved(false);
-                        }}
-                        placeholder="MH 15 AB 1234"
-                        autoComplete="off"
-                      />
-                    </Field>
-                    {rcPhoto ? (
-                      <Photo
-                        src={rcPhoto}
-                        alt="Vehicle RC paper"
-                        className="mt-2 h-28 w-full rounded-lg border border-line"
-                        sizes="(max-width: 640px) 100vw, 320px"
-                      />
-                    ) : (
-                      <div className="mt-2 flex h-28 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line bg-cream/40 text-stone">
-                        <ImagePlus className="size-6 text-forest/40" />
-                        <p className="text-[0.62rem]">No RC photo added</p>
+                            {dlPhoto ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                disabled={uploadingDoc !== null}
+                                onClick={() => removeDocument("dl")}
+                              >
+                                <Trash className="size-3.5" /> Remove
+                              </Button>
+                            ) : null}
                       </div>
-                    )}
-                    <input
-                      ref={rcInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/avif"
-                      className="hidden"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (file) void uploadDocument("rc", file);
-                      }}
-                    />
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        loading={uploadingDoc === "rc"}
-                        disabled={uploadingDoc !== null}
-                        onClick={() => rcInputRef.current?.click()}
+                      <p className="mt-1.5 text-[0.6rem] leading-relaxed text-stone">
+                        If you do not have a driving licence, leave this empty. It is not required.
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-line bg-paper p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="flex items-center gap-1.5 text-xs font-semibold text-forest">
+                          <FileCheck className="size-3.5" /> Vehicle RC
+                        </p>
+                        <Badge tone={rcVerified ? "green" : "stone"}>
+                          {rcVerified ? "Verified" : "Not added"}
+                        </Badge>
+                      </div>
+                      <Field
+                        label="RC number"
+                        className="mt-2"
+                        hint="Type the number printed on the RC paper."
                       >
-                        <Upload className="size-3.5" /> {rcPhoto ? "Replace RC photo" : "Upload RC photo"}
-                      </Button>
+                        <Input
+                          value={rcNumber}
+                          onChange={(event) => {
+                            setRcNumber(event.target.value.toUpperCase());
+                            setSaved(false);
+                          }}
+                          placeholder="MH 15 AB 1234"
+                          autoComplete="off"
+                        />
+                      </Field>
                       {rcPhoto ? (
+                        <Photo
+                          src={rcPhoto}
+                          alt="Vehicle RC paper"
+                          className="mt-2 h-28 w-full rounded-lg border border-line"
+                          sizes="(max-width: 640px) 100vw, 320px"
+                        />
+                      ) : (
+                        <div className="mt-2 flex h-28 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line bg-cream/40 text-stone">
+                          <ImagePlus className="size-6 text-forest/40" />
+                          <p className="text-[0.62rem]">No RC photo added</p>
+                        </div>
+                      )}
+                      <input
+                        ref={rcInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/avif"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file) void uploadDocument("rc", file);
+                        }}
+                      />
+                      <div className="mt-2 flex flex-wrap gap-1.5">
                         <Button
                           type="button"
-                          variant="ghost"
+                          variant="secondary"
                           size="sm"
+                          loading={uploadingDoc === "rc"}
                           disabled={uploadingDoc !== null}
-                          onClick={() => removeDocument("rc")}
+                          onClick={() => rcInputRef.current?.click()}
                         >
-                          <Trash className="size-3.5" /> Remove
+                          <Upload className="size-3.5" /> {rcPhoto ? "Replace RC photo" : "Upload RC photo"}
                         </Button>
-                      ) : null}
-                    </div>
-                    <p className="mt-1.5 text-[0.6rem] leading-relaxed text-stone">
-                      Enter the RC number manually, upload a photo, or do both.
-                    </p>
-                  </div>
-                    </div>
-
-                    <p className="mt-2.5 flex items-start gap-1.5 text-[0.62rem] leading-relaxed text-stone">
-                      <ShieldCheck className="mt-0.5 size-3 shrink-0 text-forest" />
-                      Verified means the file was uploaded successfully and, for the RC, the number
-                      matches the Indian registration format. KisanTractor never asks for a bank OTP,
-                      UPI PIN or password.
-                    </p>
-
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-3">
-                      <p className="text-[0.62rem] leading-relaxed text-stone">
-                        Your documents are saved with your profile.
+                        {rcPhoto ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={uploadingDoc !== null}
+                            onClick={() => removeDocument("rc")}
+                          >
+                            <Trash className="size-3.5" /> Remove
+                          </Button>
+                        ) : null}
+                      </div>
+                      <p className="mt-1.5 text-[0.6rem] leading-relaxed text-stone">
+                        Enter the RC number manually, upload a photo, or do both.
                       </p>
-                      <Button type="button" size="sm" onClick={save} loading={saving}>
-                        <Check className="size-3.5" /> Save changes
-                      </Button>
                     </div>
-                  </div>
-                ) : null}
-              </div>
+                      </div>
+
+                      <p className="mt-2.5 flex items-start gap-1.5 text-[0.62rem] leading-relaxed text-stone">
+                        <ShieldCheck className="mt-0.5 size-3 shrink-0 text-forest" />
+                        Verified means the file was uploaded successfully and, for the RC, the number
+                        matches the Indian registration format. KisanTractor never asks for a bank OTP,
+                        UPI PIN or password.
+                      </p>
+
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-3">
+                        <p className="text-[0.62rem] leading-relaxed text-stone">
+                          Your documents are saved with your profile.
+                        </p>
+                        <Button type="button" size="sm" onClick={save} loading={saving}>
+                          <Check className="size-3.5" /> Save changes
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/80 pt-4">
                 <p className="text-[0.65rem] leading-relaxed text-stone">

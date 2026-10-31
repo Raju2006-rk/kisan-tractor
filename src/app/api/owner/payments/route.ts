@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { refreshSession } from "@/lib/auth";
 import { updateOwnerPaymentDetails } from "@/lib/booking-service";
 import { handleApiError, jsonError, readJson, requireUser } from "@/lib/http";
 import type { PaymentMethod } from "@/lib/types";
@@ -35,6 +36,7 @@ export async function PATCH(request: Request) {
       bankIfsc: body.bankIfsc ?? "",
       preferredMethod: method,
     });
+    await refreshSession(user.id);
     return NextResponse.json({ profile });
   } catch (error) {
     return handleApiError(error);

@@ -10,7 +10,12 @@ const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 export async function POST(request: Request) {
   try {
     await requireUser();
-    const form = await request.formData();
+    let form: FormData;
+    try {
+      form = await request.formData();
+    } catch {
+      return jsonError("Please send the image as multipart form data.", 400);
+    }
     const file = form.get("file");
     if (!(file instanceof File)) {
       return jsonError("Please choose an image to upload.", 400);

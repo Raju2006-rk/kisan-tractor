@@ -40,6 +40,9 @@ import { cn, haversineKm } from "@/lib/utils";
 
 type TractorStatus = "active" | "maintenance" | "inactive";
 
+/** How far a GPS reading may be from a seeded village and still be adopted. */
+const SERVICE_AREA_KM = 50;
+
 type TractorForm = {
   id?: string;
   brand: string;
@@ -134,6 +137,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
     lng: user.ownerProfile?.lng ?? VILLAGES[0].lng,
   }));
   const [locating, setLocating] = useState(false);
+  const [formLocationError, setFormLocationError] = useState<string | null>(null);
+  const [formLocationNote, setFormLocationNote] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const editing = Boolean(form.id);
@@ -150,6 +155,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
       lng: user.ownerProfile?.lng ?? VILLAGES[0].lng,
     });
     setError(null);
+    setFormLocationError(null);
+    setFormLocationNote(null);
     setFormOpen(true);
   }
 
@@ -157,11 +164,15 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
     setForm(formFromTractor(tractor));
     setFormCoords({ lat: tractor.lat, lng: tractor.lng });
     setError(null);
+    setFormLocationError(null);
+    setFormLocationNote(null);
     setFormOpen(true);
   }
 
   function changeVillageSelection(value: string) {
     update("village", value);
+    setFormLocationError(null);
+    setFormLocationNote(null);
     const match = VILLAGES.find(
       (item) => item.name.toLowerCase() === value.trim().toLowerCase(),
     );
@@ -169,8 +180,18 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
   }
 
   function useFormLocation() {
+    setFormLocationError(null);
+    setFormLocationNote(null);
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setFormLocationError(
+        "Location detection needs a secure https connection. Open this site over https, or type your village instead.",
+      );
+      return;
+    }
     if (!navigator.geolocation) {
-      setError("Your browser cannot detect location. Choose or type your village instead.");
+      setFormLocationError(
+        "This browser cannot detect location. Choose or type your village instead.",
+      );
       return;
     }
     setLocating(true);
@@ -180,29 +201,39 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
         const lat = Math.round(position.coords.latitude * 10000) / 10000;
         const lng = Math.round(position.coords.longitude * 10000) / 10000;
         setFormCoords({ lat, lng });
-        const isCustomVillage =
-          form.village.trim() !== "" &&
-          !VILLAGES.some(
-            (village) => village.name.toLowerCase() === form.village.trim().toLowerCase(),
-          );
-        if (!isCustomVillage) {
-          const nearest = VILLAGES.reduce(
-            (best, village) => {
-              const distance = haversineKm({ lat, lng }, village);
-              return distance < best.distance ? { village, distance } : best;
-            },
-            { village: VILLAGES[0], distance: Number.POSITIVE_INFINITY },
-          );
-          update("village", nearest.village.name);
-        }
         setLocating(false);
+        const nearest = VILLAGES.reduce(
+          (best, village) => {
+            const distance = haversineKm({ lat, lng }, village);
+            return distance < best.distance ? { village, distance } : best;
+          },
+          { village: VILLAGES[0], distance: Number.POSITIVE_INFINITY },
+        );
+        // Only adopt a seeded village name when the reading is inside the
+        // supported service area; otherwise keep the owner's typed village.
+        if (nearest.distance <= SERVICE_AREA_KM) {
+          update("village", nearest.village.name);
+          setFormLocationNote(
+            `Found you near ${nearest.village.name} (${nearest.distance.toFixed(1)} km from the village centre).`,
+          );
+        } else {
+          setFormLocationNote(
+            `Your device is ${Math.round(nearest.distance)} km from ${nearest.village.name}, outside the service area. Your typed village stays "${form.village}".`,
+          );
+        }
         push("Tractor location detected from your device.", "success");
       },
-      () => {
+      (positionError) => {
         setLocating(false);
-        setError("Location permission was not given. Choose or type your village instead.");
+        setFormLocationError(
+          positionError.code === positionError.PERMISSION_DENIED
+            ? "Location permission is blocked. Allow location for this site in your browser settings, or type your village instead."
+            : positionError.code === positionError.TIMEOUT
+              ? "Location took too long. Try again near a window or outdoors, or type your village instead."
+              : "Could not read your location. Try again, or type your village instead.",
+        );
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
     );
   }
 
@@ -604,6 +635,22 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
                 <p className="mt-2 text-[0.6rem] text-stone">
                   {formCoords.lat.toFixed(4)}, {formCoords.lng.toFixed(4)}
                 </p>
+                {formLocationError ? (
+                  <p
+                    role="alert"
+                    className="mt-2 rounded-xl border border-clay/25 bg-clay/8 px-2.5 py-2 text-[0.65rem] leading-relaxed text-clay-dark"
+                  >
+                    {formLocationError}
+                  </p>
+                ) : null}
+                {formLocationNote ? (
+                  <p
+                    role="status"
+                    className="mt-2 inline-flex items-start gap-1.5 rounded-xl bg-forest/8 px-2.5 py-1.5 text-[0.62rem] font-semibold leading-relaxed text-forest"
+                  >
+                    <LocateFixed className="mt-0.5 size-3 shrink-0" /> {formLocationNote}
+                  </p>
+                ) : null}
               </div>
               <Field label={t("app.availability")}>
                 <Select

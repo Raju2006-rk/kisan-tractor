@@ -74,6 +74,9 @@ const pricingIcons: Record<PricingType, typeof Clock3> = {
   trip: Truck,
 };
 
+/** How far a GPS reading may be from a seeded village and still be named. */
+const SERVICE_AREA_KM = 50;
+
 const steps = [
   { title: "Tractor", hint: "Choose the machine" },
   { title: "Work", hint: "Service, rate & time" },
@@ -329,6 +332,12 @@ export function BookingWizard({
 
   function useMyLocation() {
     setError(null);
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setError(
+        "Location sharing needs a secure https connection. Choose your village instead.",
+      );
+      return;
+    }
     if (!navigator.geolocation) {
       setError("Your browser cannot share location. Choose your village instead.");
       return;
@@ -339,29 +348,42 @@ export function BookingWizard({
         const lat = Math.round(position.coords.latitude * 10000) / 10000;
         const lng = Math.round(position.coords.longitude * 10000) / 10000;
         setCoords({ lat, lng });
+        const nearest = VILLAGES.reduce(
+          (best, village) => {
+            const distance = haversineKm({ lat, lng }, village);
+            return distance < best.distance ? { village, distance } : best;
+          },
+          { village: VILLAGES[0], distance: Number.POSITIVE_INFINITY },
+        );
         const isCustomVillage =
           villageName.trim() !== "" &&
           !VILLAGES.some(
             (village) => village.name.toLowerCase() === villageName.trim().toLowerCase(),
           );
-        if (!isCustomVillage) {
-          const nearest = VILLAGES.reduce(
-            (best, village) => {
-              const distance = haversineKm({ lat, lng }, village);
-              return distance < best.distance ? { village, distance } : best;
-            },
-            { village: VILLAGES[0], distance: Number.POSITIVE_INFINITY },
-          );
+        // Keep a typed village name when the reading is outside the area the
+        // seeded villages cover; the GPS coordinates are still used.
+        if (!isCustomVillage && nearest.distance <= SERVICE_AREA_KM) {
           setVillageName(nearest.village.name);
         }
         setLocating(false);
-        push("Location captured for this booking.", "success");
+        push(
+          nearest.distance <= SERVICE_AREA_KM
+            ? "Location captured for this booking."
+            : "Location captured. Please confirm the village name for this booking.",
+          "success",
+        );
       },
-      () => {
+      (positionError) => {
         setLocating(false);
-        setError("Location permission was not given. Choose your village instead.");
+        setError(
+          positionError.code === positionError.PERMISSION_DENIED
+            ? "Location permission is blocked. Allow location for this site, or choose your village instead."
+            : positionError.code === positionError.TIMEOUT
+              ? "Location took too long. Try again, or choose your village instead."
+              : "Could not read your location. Choose your village instead.",
+        );
       },
-      { enableHighAccuracy: true, timeout: 10000 },
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
     );
   }
 

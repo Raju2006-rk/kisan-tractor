@@ -125,18 +125,54 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     userId = session.userId;
   }
 
-  const user = db.users.find((u) => u.id === userId) ?? decoded?.user;
-  if (!user) return null;
-  const farmerProfile =
-    db.farmerProfiles.find((p) => p.userId === user.id) ??
-    decoded?.farmerProfile;
-  const ownerProfile =
-    db.ownerProfiles.find((p) => p.userId === user.id) ??
-    decoded?.ownerProfile;
-  return { ...user, farmerProfile, ownerProfile };
+  const dbUser = db.users.find((u) => u.id === userId) ?? decoded?.user;
+  if (!dbUser) return null;
+
+  const dbFarmer = db.farmerProfiles.find((p) => p.userId === userId);
+  const dbOwner = db.ownerProfiles.find((p) => p.userId === userId);
+  const snapFarmer = decoded?.farmerProfile;
+  const snapOwner = decoded?.ownerProfile;
+
+  // The signed cookie carries the last profile values this user saved. Prefer
+  // them over the per-instance JSON store, which is re-seeded on every fresh
+  // serverless instance and would otherwise revert saved villages and
+  // auto-detected coordinates. Sensitive fields stay in the store only.
+  const farmerProfile: FarmerProfile | undefined = snapFarmer
+    ? {
+        ...(dbFarmer ?? {}),
+        ...snapFarmer,
+        documents: dbFarmer?.documents ?? snapFarmer.documents,
+      }
+    : dbFarmer;
+
+  const ownerProfile: OwnerProfile | undefined = snapOwner
+    ? {
+        ...(dbOwner ?? {}),
+        ...snapOwner,
+        documents: dbOwner?.documents ?? snapOwner.documents,
+        payment: {
+          ...snapOwner.payment,
+          upiId: dbOwner?.payment.upiId || snapOwner.payment.upiId,
+          qrImage: dbOwner?.payment.qrImage || snapOwner.payment.qrImage,
+          bankAccountNumber:
+            dbOwner?.payment.bankAccountNumber ||
+            snapOwner.payment.bankAccountNumber,
+          bankIfsc:
+            dbOwner?.payment.bankIfsc || snapOwner.payment.bankIfsc,
+        },
+      }
+    : dbOwner;
+
+  return {
+    ...dbUser,
+    ...(decoded?.user ?? {}),
+    profilePhoto: dbUser.profilePhoto ?? decoded?.user?.profilePhoto ?? null,
+    farmerProfile,
+    ownerProfile,
+  };
 }
 
-export async function createSession(userId: string): Promise<string> {
+async function writeSessionCookie(userId: string): Promise<string> {
   const db = await getDb();
   const user = db.users.find((u) => u.id === userId);
   if (!user) {
@@ -173,6 +209,22 @@ export async function createSession(userId: string): Promise<string> {
     maxAge: SESSION_DAYS * 24 * 60 * 60,
   });
   return token;
+}
+
+export async function createSession(userId: string): Promise<string> {
+  return writeSessionCookie(userId);
+}
+
+/**
+ * Re-issue the signed cookie after a profile write so the saved values survive
+ * on a different serverless instance (which only has the seed JSON store).
+ */
+export async function refreshSession(userId: string): Promise<void> {
+  const jar = await cookies();
+  if (!jar.get(SESSION_COOKIE)?.value) return;
+  const db = await getDb();
+  if (!db.users.some((u) => u.id === userId)) return;
+  await writeSessionCookie(userId);
 }
 
 export async function destroySession(): Promise<void> {

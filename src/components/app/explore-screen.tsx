@@ -38,6 +38,9 @@ const ExploreMap = dynamic(() => import("@/components/app/explore-map"), {
 
 type Sort = "nearest" | "price";
 
+/** How far a GPS reading may be from a seeded village and still be named. */
+const SERVICE_AREA_KM = 50;
+
 export function ExploreScreen({ user }: { user: SessionUser }) {
   const { t } = useI18n();
   const { push } = useToast();
@@ -104,6 +107,10 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
   }
 
   function useMyLocation() {
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      push("Location needs a secure https connection. Choose your village in Profile.", "error");
+      return;
+    }
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       push("Your browser cannot detect location. Choose your village in Profile.", "error");
       return;
@@ -121,15 +128,31 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
           },
           { village: VILLAGES[0], distance: Number.POSITIVE_INFINITY },
         );
-        setLocationLabel(nearest.village.name);
+        // Do not claim a village name when the reading is outside the area
+        // those villages cover; distances are still calculated from the GPS.
+        setLocationLabel(
+          nearest.distance <= SERVICE_AREA_KM ? nearest.village.name : "your location",
+        );
         setLocating(false);
-        push("Showing tractors near your current location.", "success");
+        push(
+          nearest.distance <= SERVICE_AREA_KM
+            ? "Showing tractors near your current location."
+            : "Showing tractors nearest to your current location.",
+          "success",
+        );
       },
-      () => {
+      (positionError) => {
         setLocating(false);
-        push("Location permission was not given. Choose your village in Profile.", "error");
+        push(
+          positionError.code === positionError.PERMISSION_DENIED
+            ? "Location permission is blocked. Allow location for this site, or choose your village in Profile."
+            : positionError.code === positionError.TIMEOUT
+              ? "Location took too long. Try again, or choose your village in Profile."
+              : "Could not read your location. Choose your village in Profile.",
+          "error",
+        );
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
     );
   }
 
