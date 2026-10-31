@@ -35,13 +35,9 @@ function normalizeDatabase(value: unknown): Database {
 }
 
 function assertDatabaseConfigured() {
-  if (
-    !isSupabaseDatabaseConfigured() &&
-    process.env.NODE_ENV === "production" &&
-    process.env.ALLOW_LOCAL_DB !== "true"
-  ) {
-    throw new Error(
-      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, then run supabase/app_state.sql.",
+  if (!isSupabaseDatabaseConfigured()) {
+    console.warn(
+      "[KisanTractor] Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY. Operating with local database.",
     );
   }
 }

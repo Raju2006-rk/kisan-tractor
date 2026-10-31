@@ -35,9 +35,13 @@ export async function POST(request: Request) {
     if (isSupabaseAuthConfigured()) {
       const verified = await verifySupabaseOtp(mobile, otp);
       if ("error" in verified) {
-        return jsonError(verified.error, 400);
+        const fallback = await verifyOtpChallenge(mobile, otp);
+        if (!fallback.ok) {
+          return jsonError(verified.error, 400);
+        }
+      } else {
+        supabaseUserId = verified.supabaseUserId;
       }
-      supabaseUserId = verified.supabaseUserId;
     } else {
       const verified = await verifyOtpChallenge(mobile, otp);
       if (!verified.ok) {

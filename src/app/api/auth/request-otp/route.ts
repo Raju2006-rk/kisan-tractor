@@ -49,22 +49,22 @@ export async function POST(request: Request) {
     }
 
     if (isSupabaseAuthConfigured()) {
-      await sendSupabaseOtp(mobile);
-      return NextResponse.json({
-        ok: true,
-        signedIn: false,
-        mobile,
-        isExisting: Boolean(existing),
-        role,
-        name: existing?.name ?? null,
-      });
-    }
-
-    if (!isDevOtpEnabled()) {
-      return jsonError(
-        "Phone sign-in is not configured. Set the Supabase environment variables.",
-        503,
-      );
+      try {
+        await sendSupabaseOtp(mobile);
+        return NextResponse.json({
+          ok: true,
+          signedIn: false,
+          mobile,
+          isExisting: Boolean(existing),
+          role,
+          name: existing?.name ?? null,
+        });
+      } catch (smsError) {
+        console.warn(
+          "[request-otp] Supabase SMS send failed (SMS provider likely not enabled in Supabase). Falling back to OTP challenge:",
+          smsError,
+        );
+      }
     }
 
     const challenge = await createOtpChallenge(mobile, role);

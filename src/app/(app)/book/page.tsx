@@ -7,18 +7,18 @@ export const metadata = { title: "Book a tractor" };
 export default async function BookPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tractor?: string; for?: string }>;
+  searchParams?: Promise<{ tractor?: string; for?: string }>;
 }) {
   const user = await getSessionUser();
   if (!user) redirect("/auth");
   if (user.role !== "farmer") redirect("/dashboard");
-  const params = await searchParams;
+  const params = searchParams ? await searchParams : undefined;
 
   return (
     <BookingWizard
       user={user}
-      initialTractorId={params.tractor}
-      initialForOther={params.for === "other"}
+      initialTractorId={params?.tractor}
+      initialForOther={params?.for === "other"}
     />
   );
 }
