@@ -12,6 +12,9 @@ export async function PATCH(request: Request) {
       preferredLanguage?: Language;
       village?: string;
       address?: string;
+      pincode?: string;
+      district?: string;
+      state?: string;
       serviceRadiusKm?: number;
       lat?: number;
       lng?: number;

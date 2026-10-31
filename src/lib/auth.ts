@@ -6,7 +6,12 @@ import {
   timingSafeEqual,
 } from "crypto";
 import { mutateDb, getDb } from "./db";
-import { getSupabaseAuth, isSupabaseAuthConfigured } from "./supabase";
+import {
+  getSupabaseAdmin,
+  getSupabaseAuth,
+  isSupabaseAuthConfigured,
+  isSupabaseDatabaseConfigured,
+} from "./supabase";
 import type {
   FarmerProfile,
   Language,
@@ -419,15 +424,60 @@ export async function findOrCreateUser(input: {
   role?: Role;
   language?: Language;
 }): Promise<{ user: User; isNew: boolean }> {
+  let userId = input.id;
+  const role: Role = input.role === "owner" ? "owner" : "farmer";
+  const name = input.name?.trim() || (role === "owner" ? "Tractor Owner" : "Farmer");
+
+  // Sync / create in Supabase Authentication so the user appears in the Supabase Dashboard
+  if (isSupabaseDatabaseConfigured()) {
+    try {
+      const admin = getSupabaseAdmin();
+      const phone = `+91${input.mobile}`;
+      const { data: userList } = await admin.auth.admin.listUsers();
+      const existingAuth = userList?.users?.find(
+        (u) => u.phone === phone || u.phone === input.mobile,
+      );
+
+      if (existingAuth) {
+        userId = existingAuth.id;
+      } else if (!userId) {
+        const { data: created, error } = await admin.auth.admin.createUser({
+          phone,
+          phone_confirm: true,
+          user_metadata: {
+            name,
+            role,
+          },
+        });
+        if (created?.user) {
+          userId = created.user.id;
+        } else if (error) {
+          console.warn("[findOrCreateUser] Supabase auth.admin.createUser:", error.message);
+        }
+      }
+    } catch (err) {
+      console.warn("[findOrCreateUser] Supabase auth sync error:", err);
+    }
+  }
+
   const db = await getDb();
   const existing = db.users.find((u) => u.mobile === input.mobile);
-  if (existing) return { user: existing, isNew: false };
-  const role: Role = input.role === "owner" ? "owner" : "farmer";
-  const userId = input.id || `usr_${randomUUID()}`;
+  if (existing) {
+    if (userId && existing.id !== userId) {
+      await mutateDb((database) => {
+        const u = database.users.find((item) => item.mobile === input.mobile);
+        if (u) u.id = userId!;
+      });
+      existing.id = userId;
+    }
+    return { user: existing, isNew: false };
+  }
+
+  userId = userId || `usr_${randomUUID()}`;
   const now = new Date().toISOString();
   const user: User = {
     id: userId,
-    name: input.name?.trim() || (role === "owner" ? "Tractor Owner" : "Farmer"),
+    name,
     mobile: input.mobile,
     role,
     preferredLanguage: input.language ?? "en",
@@ -439,25 +489,27 @@ export async function findOrCreateUser(input: {
     if (role === "farmer") {
       const profile: FarmerProfile = {
         userId,
-        address: "Niphad",
-        village: "Niphad",
-        district: "Nashik",
-        state: "Maharashtra",
-        lat: 20.0833,
-        lng: 73.9333,
+        address: "",
+        village: "",
+        district: "",
+        state: "",
+        pincode: "",
+        lat: 0,
+        lng: 0,
       };
       database.farmerProfiles.push(profile);
     } else {
       const profile: OwnerProfile = {
         userId,
-        address: "Niphad",
-        village: "Niphad",
-        district: "Nashik",
-        state: "Maharashtra",
-        lat: 20.0833,
-        lng: 73.9333,
+        address: "",
+        village: "",
+        district: "",
+        state: "",
+        pincode: "",
+        lat: 0,
+        lng: 0,
         online: true,
-        serviceRadiusKm: 10,
+        serviceRadiusKm: 15,
         payment: {
           shareUpi: false,
           upiId: "",

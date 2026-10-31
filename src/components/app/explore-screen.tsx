@@ -29,7 +29,7 @@ import { useToast } from "@/components/providers/app-providers";
 import { SERVICES, VILLAGES } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 import type { PricingType, ServiceType, SessionUser, TractorWithOwner } from "@/lib/types";
-import { cn, haversineKm } from "@/lib/utils";
+import { cn, haversineKm, reverseGeocode } from "@/lib/utils";
 
 const ExploreMap = dynamic(() => import("@/components/app/explore-map"), {
   ssr: false,
@@ -117,29 +117,21 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
     }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const lat = Math.round(position.coords.latitude * 10000) / 10000;
         const lng = Math.round(position.coords.longitude * 10000) / 10000;
         setCoords({ lat, lng });
-        const nearest = VILLAGES.reduce(
-          (best, village) => {
-            const value = haversineKm({ lat, lng }, village);
-            return value < best.distance ? { village, distance: value } : best;
-          },
-          { village: VILLAGES[0], distance: Number.POSITIVE_INFINITY },
-        );
-        // Do not claim a village name when the reading is outside the area
-        // those villages cover; distances are still calculated from the GPS.
-        setLocationLabel(
-          nearest.distance <= SERVICE_AREA_KM ? nearest.village.name : "your location",
-        );
-        setLocating(false);
-        push(
-          nearest.distance <= SERVICE_AREA_KM
-            ? "Showing tractors near your current location."
-            : "Showing tractors nearest to your current location.",
-          "success",
-        );
+
+        try {
+          const geo = await reverseGeocode(lat, lng);
+          setLocationLabel(geo.village || "your location");
+        } catch {
+          setLocationLabel("your location");
+        } finally {
+          setLocating(false);
+        }
+
+        push("Showing tractors near your current location.", "success");
       },
       (positionError) => {
         setLocating(false);
@@ -152,7 +144,7 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
           "error",
         );
       },
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
     );
   }
 

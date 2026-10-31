@@ -36,7 +36,7 @@ import { EQUIPMENT_CATALOG, VILLAGES } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 import { formatRupees } from "@/lib/pricing";
 import type { SessionUser, TractorWithOwner } from "@/lib/types";
-import { cn, haversineKm } from "@/lib/utils";
+import { cn, haversineKm, reverseGeocode } from "@/lib/utils";
 
 type TractorStatus = "active" | "maintenance" | "inactive";
 
@@ -197,31 +197,26 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
     setLocating(true);
     setError(null);
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const lat = Math.round(position.coords.latitude * 10000) / 10000;
         const lng = Math.round(position.coords.longitude * 10000) / 10000;
         setFormCoords({ lat, lng });
-        setLocating(false);
-        const nearest = VILLAGES.reduce(
-          (best, village) => {
-            const distance = haversineKm({ lat, lng }, village);
-            return distance < best.distance ? { village, distance } : best;
-          },
-          { village: VILLAGES[0], distance: Number.POSITIVE_INFINITY },
-        );
-        // Only adopt a known village name when the reading is inside the
-        // supported service area; otherwise keep the owner's typed village.
-        if (nearest.distance <= SERVICE_AREA_KM) {
-          update("village", nearest.village.name);
+
+        try {
+          const geo = await reverseGeocode(lat, lng);
+          if (geo.village) update("village", geo.village);
           setFormLocationNote(
-            `Found you near ${nearest.village.name} (${nearest.distance.toFixed(1)} km from the village centre).`,
+            geo.village
+              ? `Tractor location detected: ${geo.village}${geo.district ? `, ${geo.district}` : ""}.`
+              : `Tractor coordinates: ${lat}, ${lng}`,
           );
-        } else {
-          setFormLocationNote(
-            `Your device is ${Math.round(nearest.distance)} km from ${nearest.village.name}, outside the service area. Your typed village stays "${form.village}".`,
-          );
+          push("Tractor location detected from your device.", "success");
+        } catch {
+          setFormLocationNote(`Tractor coordinates: ${lat}, ${lng}`);
+          push("Tractor location detected from your device.", "success");
+        } finally {
+          setLocating(false);
         }
-        push("Tractor location detected from your device.", "success");
       },
       (positionError) => {
         setLocating(false);
@@ -233,7 +228,7 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
               : "Could not read your location. Try again, or type your village instead.",
         );
       },
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
     );
   }
 

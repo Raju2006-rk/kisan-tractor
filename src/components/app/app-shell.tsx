@@ -182,7 +182,11 @@ export function AppShell({
               {isOwner ? "Tractor owner" : "Farmer"}
             </span>
             <span className="inline-flex items-center gap-1 text-[0.62rem] font-semibold text-wheat">
-              {isOwner ? (online ? "Online" : "Offline") : "Nashik"}
+              {isOwner
+                ? online
+                  ? "Online"
+                  : "Offline"
+                : user.farmerProfile?.village || user.farmerProfile?.district || "Active"}
             </span>
           </div>
         </div>

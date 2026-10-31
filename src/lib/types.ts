@@ -77,6 +77,7 @@ export type FarmerProfile = {
   village: string;
   district: string;
   state: string;
+  pincode?: string;
   lat: number;
   lng: number;
   documents?: UserDocuments;
@@ -100,6 +101,7 @@ export type OwnerProfile = {
   village: string;
   district: string;
   state: string;
+  pincode?: string;
   lat: number;
   lng: number;
   online: boolean;

@@ -155,3 +155,50 @@ export function computeBreakMinutes(
 export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+export type ReverseGeocodeResult = {
+  address: string;
+  village: string;
+  pincode: string;
+  district: string;
+  state: string;
+};
+
+export async function reverseGeocode(
+  lat: number,
+  lng: number,
+): Promise<ReverseGeocodeResult> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+      { headers: { "Accept-Language": "en" } },
+    );
+    if (!res.ok) throw new Error("Reverse geocode failed");
+    const data = await res.json();
+    const addr = data.address || {};
+    const village =
+      addr.village ||
+      addr.suburb ||
+      addr.town ||
+      addr.neighbourhood ||
+      addr.hamlet ||
+      addr.city_district ||
+      addr.county ||
+      addr.city ||
+      "";
+    const pincode = addr.postcode || "";
+    const district = addr.state_district || addr.county || addr.city || "";
+    const state = addr.state || "";
+    const address = data.display_name || "";
+    return { address, village, pincode, district, state };
+  } catch (err) {
+    console.warn("Reverse geocode failed, using coordinates fallback:", err);
+    return {
+      address: `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+      village: "",
+      pincode: "",
+      district: "",
+      state: "",
+    };
+  }
+}

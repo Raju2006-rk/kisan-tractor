@@ -1310,6 +1310,9 @@ export async function updateUserProfile(
     preferredLanguage?: Language;
     village?: string;
     address?: string;
+    pincode?: string;
+    district?: string;
+    state?: string;
     serviceRadiusKm?: number;
     lat?: number;
     lng?: number;
@@ -1347,6 +1350,9 @@ export async function updateUserProfile(
         profile.village = village;
       }
       if (input.address !== undefined) profile.address = input.address.trim();
+      if (input.pincode !== undefined) profile.pincode = input.pincode.trim();
+      if (input.district !== undefined) profile.district = input.district.trim();
+      if (input.state !== undefined) profile.state = input.state.trim();
       if (input.lat !== undefined) {
         if (!Number.isFinite(input.lat) || input.lat < -90 || input.lat > 90) {
           throw new ServiceError("Please provide a valid latitude.", 400);

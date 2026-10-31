@@ -80,19 +80,17 @@ async function readSupabaseState(): Promise<{ db: Database; version: number } | 
     );
   }
 
-  if (!data) {
+  const rawData = data?.data && typeof data.data === "object" ? data.data : {};
+  const isStateEmpty = Object.keys(rawData).length === 0;
+
+  if (!data || isStateEmpty) {
     const initial = buildInitialDatabase();
-    const { error: insertError } = await supabase.from("app_state").insert({
+    await supabase.from("app_state").upsert({
       id: STATE_ID,
       data: initial,
       version: 1,
+      updated_at: new Date().toISOString(),
     });
-    if (insertError && insertError.code !== "23505") {
-      throw new Error(
-        `Could not create the Supabase app_state row (${insertError.message}). Run supabase/app_state.sql in the SQL editor.`,
-      );
-    }
-    if (insertError) return readSupabaseState();
     return { db: initial, version: 1 };
   }
 

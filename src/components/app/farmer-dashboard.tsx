@@ -78,7 +78,9 @@ export function FarmerDashboard({ user }: { user: SessionUser }) {
           <div className="flex items-center gap-2">
             <Badge tone="green" dot>{t("app.farmerTag")}</Badge>
             <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone/70">
-              Niphad, Nashik
+              {user.farmerProfile?.village
+                ? `${user.farmerProfile.village}${user.farmerProfile.district ? `, ${user.farmerProfile.district}` : ""}`
+                : "Location not set"}
             </span>
           </div>
           <h1 className="mt-2 font-display text-3xl text-forest sm:text-[2.4rem]">
@@ -418,7 +420,9 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
           <div className="flex items-center gap-2">
             <Badge tone="green" dot>{t("app.ownerTag")}</Badge>
             <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone/70">
-              Niphad, Nashik
+              {user.ownerProfile?.village
+                ? `${user.ownerProfile.village}${user.ownerProfile.district ? `, ${user.ownerProfile.district}` : ""}`
+                : "Location not set"}
             </span>
           </div>
           <h1 className="mt-2 font-display text-3xl text-forest sm:text-[2.4rem]">

@@ -52,6 +52,7 @@ import {
   formatDate,
   haversineKm,
   mobileEnding,
+  reverseGeocode,
   timeToMinutes,
   todayISO,
 } from "@/lib/utils";
@@ -344,34 +345,26 @@ export function BookingWizard({
     }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const lat = Math.round(position.coords.latitude * 10000) / 10000;
         const lng = Math.round(position.coords.longitude * 10000) / 10000;
         setCoords({ lat, lng });
-        const nearest = VILLAGES.reduce(
-          (best, village) => {
-            const distance = haversineKm({ lat, lng }, village);
-            return distance < best.distance ? { village, distance } : best;
-          },
-          { village: VILLAGES[0], distance: Number.POSITIVE_INFINITY },
-        );
-        const isCustomVillage =
-          villageName.trim() !== "" &&
-          !VILLAGES.some(
-            (village) => village.name.toLowerCase() === villageName.trim().toLowerCase(),
+
+        try {
+          const geo = await reverseGeocode(lat, lng);
+          if (geo.village) setVillageName(geo.village);
+          if (geo.address) setFarmLabel(geo.address);
+          push(
+            geo.village
+              ? `Location auto-detected: ${geo.village}`
+              : "Location coordinates captured from device.",
+            "success",
           );
-        // Keep a typed village name when the reading is outside the area the
-        // known villages cover; the GPS coordinates are still used.
-        if (!isCustomVillage && nearest.distance <= SERVICE_AREA_KM) {
-          setVillageName(nearest.village.name);
+        } catch {
+          push("Location coordinates captured from device.", "info");
+        } finally {
+          setLocating(false);
         }
-        setLocating(false);
-        push(
-          nearest.distance <= SERVICE_AREA_KM
-            ? "Location captured for this booking."
-            : "Location captured. Please confirm the village name for this booking.",
-          "success",
-        );
       },
       (positionError) => {
         setLocating(false);
@@ -383,7 +376,7 @@ export function BookingWizard({
               : "Could not read your location. Choose your village instead.",
         );
       },
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
     );
   }
 

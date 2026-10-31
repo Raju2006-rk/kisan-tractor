@@ -39,7 +39,7 @@ import { useToast } from "@/components/providers/app-providers";
 import { LANGUAGES, VILLAGES } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 import type { Language, SessionUser } from "@/lib/types";
-import { cn, formatDate, haversineKm, maskMobile } from "@/lib/utils";
+import { cn, formatDate, haversineKm, maskMobile, reverseGeocode } from "@/lib/utils";
 
 /** Match a GPS reading to the closest known service village. */
 function nearestVillage(lat: number, lng: number) {
@@ -58,16 +58,19 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
   const router = useRouter();
   const profile = user.farmerProfile ?? user.ownerProfile;
   const isOwner = user.role === "owner";
-  const currentVillage = profile?.village ?? "Niphad";
+  const currentVillage = profile?.village ?? "";
   const [name, setName] = useState(user.name);
   const [village, setVillage] = useState(currentVillage);
   const [address, setAddress] = useState(profile?.address ?? "");
+  const [pincode, setPincode] = useState(profile?.pincode ?? "");
+  const [district, setDistrict] = useState(profile?.district ?? "");
+  const [stateName, setStateName] = useState(profile?.state ?? "");
   const [serviceRadiusKm, setServiceRadiusKm] = useState(
-    String(user.ownerProfile?.serviceRadiusKm ?? 10),
+    String(user.ownerProfile?.serviceRadiusKm ?? 15),
   );
   const [coords, setCoords] = useState(() => ({
-    lat: profile?.lat ?? VILLAGES[0].lat,
-    lng: profile?.lng ?? VILLAGES[0].lng,
+    lat: profile?.lat ?? 0,
+    lng: profile?.lng ?? 0,
   }));
   const [locating, setLocating] = useState(false);
   const [locationNote, setLocationNote] = useState<string | null>(null);
@@ -91,11 +94,6 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
   const rcVerified = rcNumberValid || Boolean(rcPhoto);
   const documentsVerified = dlVerified || rcVerified;
 
-  const selectedVillage =
-    VILLAGES.find((item) => item.name === village) ??
-    VILLAGES.find((item) => item.name === currentVillage) ??
-    nearestVillage(coords.lat, coords.lng).village;
-
   function chooseVillage(name: string) {
     setVillage(name);
     setLocationNote(null);
@@ -105,6 +103,8 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
     );
     if (match) {
       setCoords({ lat: match.lat, lng: match.lng });
+      setDistrict(match.district);
+      setStateName(match.state);
     }
   }
 
@@ -125,26 +125,29 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
     }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const lat = Math.round(position.coords.latitude * 10000) / 10000;
         const lng = Math.round(position.coords.longitude * 10000) / 10000;
-        const match = nearestVillage(lat, lng);
-        setLocating(false);
-        // Only snap to a known village when the reading is inside the
-        // supported service area. Farther readings are reported but not saved,
-        // so a farmer outside Nashik keeps a usable saved village.
-        if (match.distance <= SERVICE_AREA_KM) {
-          setCoords({ lat, lng });
-          setVillage(match.village.name);
+        setCoords({ lat, lng });
+
+        try {
+          const geo = await reverseGeocode(lat, lng);
+          if (geo.village) setVillage(geo.village);
+          if (geo.address) setAddress(geo.address);
+          if (geo.pincode) setPincode(geo.pincode);
+          if (geo.district) setDistrict(geo.district);
+          if (geo.state) setStateName(geo.state);
+
+          const summary = [geo.village, geo.district, geo.state].filter(Boolean).join(", ");
           setLocationNote(
-            `Found you near ${match.village.name} (${match.distance.toFixed(1)} km from the village centre). Tap Save to keep it.`,
+            `Found: ${summary || `${lat}, ${lng}`}${geo.pincode ? ` (Pincode: ${geo.pincode})` : ""}. Tap Save to update profile.`,
           );
           push("Location detected from your device.", "success");
-        } else {
-          setLocationNote(
-            `Your device is ${Math.round(match.distance)} km from ${match.village.name}, outside the KisanTractor service area. Your saved village stays "${village}".`,
-          );
-          push("Detected a location outside the service area.", "error");
+        } catch {
+          setLocationNote(`Coordinates captured: ${lat}, ${lng}. Tap Save to update profile.`);
+          push("Coordinates captured from your device.", "info");
+        } finally {
+          setLocating(false);
         }
       },
       (positionError) => {
@@ -157,7 +160,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
               : "Could not read your location. Try again, or type your village manually.",
         );
       },
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
     );
   }
 
@@ -192,13 +195,16 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          village,
+          village: village.trim(),
           address: address.trim(),
+          pincode: pincode.trim(),
+          district: district.trim(),
+          state: stateName.trim(),
           lat: coords.lat,
           lng: coords.lng,
           ...(isOwner
             ? {
-                serviceRadiusKm: Number(serviceRadiusKm) || 10,
+                serviceRadiusKm: Number(serviceRadiusKm) || 15,
                 documents: {
                   dlPhoto: dlPhoto || null,
                   rcNumber: rcNumber.trim() || null,
@@ -266,7 +272,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
         <div className="flex items-center gap-2">
           <Badge tone="green" dot>{roleLabel(user.role)}</Badge>
           <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone/70">
-            {currentVillage} · Nashik
+            {village ? `${village}${district ? ` · ${district}` : ""}` : "Location not set"}
           </span>
         </div>
         <h1 className="mt-2 font-display text-3xl text-forest sm:text-[2.4rem]">
@@ -327,20 +333,29 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                   <Field
                     label={t("app.village")}
                     required
-                    hint="Type your village name. We fill the map location when it matches a known village, or use your current location below."
+                    hint="Village, town or locality name."
                   >
                     <Input
                       value={village}
-                      onChange={(event) => chooseVillage(event.target.value)}
+                      onChange={(event) => setVillage(event.target.value)}
                       placeholder="Type your village name"
                       autoComplete="address-level2"
+                    />
+                  </Field>
+                  <Field label="Pincode" hint="6-digit postal code">
+                    <Input
+                      value={pincode}
+                      onChange={(event) => setPincode(event.target.value)}
+                      placeholder="e.g. 500001"
+                      maxLength={6}
+                      inputMode="numeric"
                     />
                   </Field>
                   <Field label={t("app.address")} className="sm:col-span-2">
                     <Input
                       value={address}
                       onChange={(event) => setAddress(event.target.value)}
-                      placeholder="House / farm address or landmark"
+                      placeholder="House / farm address, landmark, road"
                     />
                   </Field>
                   <div className="rounded-2xl border border-line/80 bg-cream/30 p-3.5 sm:col-span-2">
@@ -350,8 +365,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                           <MapPin className="size-3.5" /> Auto-detect my location
                         </p>
                         <p className="mt-0.5 text-[0.65rem] leading-relaxed text-stone">
-                          Use this device’s GPS to fill your village and map position. You can still
-                          change the village manually.
+                          Use GPS to auto-fill your exact village, address, pincode, and coordinates.
                         </p>
                       </div>
                       <Button
@@ -381,8 +395,9 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                       </p>
                     ) : null}
                     <p className="mt-2 text-[0.6rem] text-stone">
-                      {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)} · {selectedVillage.district},{" "}
-                      {selectedVillage.state}
+                      {coords.lat && coords.lng
+                        ? `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}${district || stateName ? ` · ${[district, stateName].filter(Boolean).join(", ")}` : ""}${pincode ? ` (${pincode})` : ""}`
+                        : "No coordinates saved yet. Tap 'Use my current location' to auto-detect."}
                     </p>
                   </div>
                   {isOwner ? (
@@ -743,8 +758,9 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
               choose a different farm location for each booking.
             </p>
             <p className="mt-2 text-[0.62rem] font-semibold text-forest">
-              {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)} · {selectedVillage.district},{" "}
-              {selectedVillage.state}
+              {coords.lat && coords.lng
+                ? `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}${district || stateName ? ` · ${[district, stateName].filter(Boolean).join(", ")}` : ""}${pincode ? ` (${pincode})` : ""}`
+                : "No location coordinates set yet."}
             </p>
           </div>
 
