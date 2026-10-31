@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
 import { handleApiError, jsonError, requireUser } from "@/lib/http";
+import { getSupabaseAdmin, isSupabaseDatabaseConfigured } from "@/lib/supabase";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
@@ -35,9 +36,35 @@ export async function POST(request: Request) {
             ? "avif"
             : "jpg";
     const fileName = `${randomUUID()}.${extension}`;
+    const bytes = Buffer.from(await file.arrayBuffer());
+
+    // 1. Try uploading to Supabase Storage 'app-files' bucket first (ideal for production)
+    if (isSupabaseDatabaseConfigured()) {
+      try {
+        const supabase = getSupabaseAdmin();
+        const { data, error } = await supabase.storage
+          .from("app-files")
+          .upload(fileName, bytes, {
+            contentType: file.type,
+            upsert: true,
+          });
+
+        if (!error && data) {
+          const { data: publicData } = supabase.storage
+            .from("app-files")
+            .getPublicUrl(fileName);
+          if (publicData?.publicUrl) {
+            return NextResponse.json({ url: publicData.publicUrl });
+          }
+        }
+      } catch (storageErr) {
+        console.warn("Supabase storage upload fallback to local:", storageErr);
+      }
+    }
+
+    // 2. Fallback to local uploads directory
     const uploadDir = path.join(process.cwd(), "public", "uploads");
     await fs.mkdir(uploadDir, { recursive: true });
-    const bytes = Buffer.from(await file.arrayBuffer());
     await fs.writeFile(path.join(uploadDir, fileName), bytes);
     return NextResponse.json({ url: `/uploads/${fileName}` });
   } catch (error) {
