@@ -24,6 +24,16 @@ export function Photo({
   overlay?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
+  const [currentSrc, setCurrentSrc] = useState(src);
+
+  if (currentSrc !== src) {
+    setCurrentSrc(src);
+    setFailed(false);
+  }
+
+  const isInline = Boolean(
+    src && (src.startsWith("data:") || src.startsWith("blob:")),
+  );
   const valid = Boolean(src) && !failed;
 
   return (
@@ -34,6 +44,7 @@ export function Photo({
           alt={alt}
           fill
           sizes={sizes}
+          unoptimized={isInline}
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : "auto"}
           onError={() => setFailed(true)}

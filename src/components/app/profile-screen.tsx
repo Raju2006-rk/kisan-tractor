@@ -503,7 +503,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                           <input
                             ref={dlInputRef}
                             type="file"
-                            accept="image/jpeg,image/png,image/webp,image/avif"
+                            accept="image/*"
                             className="hidden"
                             onChange={(event) => {
                               const file = event.target.files?.[0];
@@ -578,7 +578,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                       <input
                         ref={rcInputRef}
                         type="file"
-                        accept="image/jpeg,image/png,image/webp,image/avif"
+                        accept="image/*"
                         className="hidden"
                         onChange={(event) => {
                           const file = event.target.files?.[0];

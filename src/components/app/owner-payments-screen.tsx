@@ -228,7 +228,7 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
                     <input
                       ref={fileRef}
                       type="file"
-                      accept="image/jpeg,image/png,image/webp,image/avif"
+                      accept="image/*"
                       className="hidden"
                       onChange={(event) => {
                         const file = event.target.files?.[0];

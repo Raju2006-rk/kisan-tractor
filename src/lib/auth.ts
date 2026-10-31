@@ -208,7 +208,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
         }
       : dbFarmer;
 
-    const ownerProfile: OwnerProfile | undefined = snapOwner
+    let ownerProfile: OwnerProfile | undefined = snapOwner
       ? {
           ...(dbOwner ?? {}),
           ...snapOwner,
@@ -225,6 +225,32 @@ export async function getSessionUser(): Promise<SessionUser | null> {
           },
         }
       : dbOwner;
+
+    if (dbUser.role === "owner" && !ownerProfile) {
+      ownerProfile = {
+        userId: dbUser.id,
+        address: farmerProfile?.address || "",
+        village: farmerProfile?.village || "",
+        district: farmerProfile?.district || "Nashik",
+        state: farmerProfile?.state || "Maharashtra",
+        pincode: farmerProfile?.pincode || "",
+        lat: farmerProfile?.lat || 20.0,
+        lng: farmerProfile?.lng || 73.8,
+        online: true,
+        serviceRadiusKm: 15,
+        payment: {
+          shareUpi: false,
+          upiId: "",
+          shareQr: false,
+          qrImage: "",
+          shareBank: false,
+          bankAccountName: dbUser.name,
+          bankAccountNumber: "",
+          bankIfsc: "",
+          preferredMethod: "cash",
+        },
+      };
+    }
 
     return {
       ...dbUser,
@@ -471,24 +497,70 @@ export async function findOrCreateUser(input: {
   const db = await getDb();
   const existing = db.users.find((u) => u.mobile === input.mobile);
   if (existing) {
-    if (userId && existing.id !== userId) {
-      const oldId = existing.id;
-      await mutateDb((database) => {
-        const u = database.users.find((item) => item.mobile === input.mobile);
-        if (u) u.id = userId!;
+    const targetUserId = userId || existing.id;
+    await mutateDb((database) => {
+      const u = database.users.find((item) => item.mobile === input.mobile);
+      if (u) {
+        if (userId && u.id !== userId) u.id = userId;
+        if (input.role && input.role !== u.role) u.role = input.role;
+      }
+      if (userId && existing.id !== userId) {
+        const oldId = existing.id;
+        const newId = userId;
         const fp = database.farmerProfiles.find((p) => p.userId === oldId);
-        if (fp) fp.userId = userId!;
+        if (fp) fp.userId = newId;
         const op = database.ownerProfiles.find((p) => p.userId === oldId);
-        if (op) op.userId = userId!;
+        if (op) op.userId = newId;
         database.bookings.forEach((b) => {
-          if (b.farmerId === oldId) b.farmerId = userId!;
+          if (b.farmerId === oldId) b.farmerId = newId;
         });
         database.tractors.forEach((t) => {
-          if (t.ownerId === oldId) t.ownerId = userId!;
+          if (t.ownerId === oldId) t.ownerId = newId;
         });
-      });
-      existing.id = userId;
-    }
+      }
+
+      const activeRole = input.role || existing.role;
+      if (activeRole === "owner" && !database.ownerProfiles.some((p) => p.userId === targetUserId)) {
+        database.ownerProfiles.push({
+          userId: targetUserId,
+          address: "",
+          village: "",
+          district: "Nashik",
+          state: "Maharashtra",
+          pincode: "",
+          lat: 20.0,
+          lng: 73.8,
+          online: true,
+          serviceRadiusKm: 15,
+          payment: {
+            shareUpi: false,
+            upiId: "",
+            shareQr: false,
+            qrImage: "",
+            shareBank: false,
+            bankAccountName: existing.name,
+            bankAccountNumber: "",
+            bankIfsc: "",
+            preferredMethod: "cash",
+          },
+        });
+      }
+      if (activeRole === "farmer" && !database.farmerProfiles.some((p) => p.userId === targetUserId)) {
+        database.farmerProfiles.push({
+          userId: targetUserId,
+          address: "",
+          village: "",
+          district: "Nashik",
+          state: "Maharashtra",
+          pincode: "",
+          lat: 20.0,
+          lng: 73.8,
+        });
+      }
+    });
+
+    if (userId) existing.id = userId;
+    if (input.role) existing.role = input.role;
     return { user: existing, isNew: false };
   }
 

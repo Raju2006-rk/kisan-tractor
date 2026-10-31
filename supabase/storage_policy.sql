@@ -10,12 +10,12 @@ VALUES (
   'app-files',
   'app-files',
   true,
-  5242880, -- 5 MB max file size limit
+  10485760, -- 10 MB max file size limit for camera and high-res photos
   ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif']
 )
 ON CONFLICT (id) DO UPDATE SET
   public = true,
-  file_size_limit = 5242880,
+  file_size_limit = 10485760,
   allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'];
 
 -- 2. Enable Row Level Security (RLS) on storage.objects
@@ -62,3 +62,4 @@ ON storage.objects
 FOR DELETE
 TO anon, authenticated
 USING (bucket_id = 'app-files');
+

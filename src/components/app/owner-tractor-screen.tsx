@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import useSWR from "swr";
 import {
+  Camera,
   Check,
   ImagePlus,
   LocateFixed,
@@ -140,6 +141,7 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
   const [formLocationError, setFormLocationError] = useState<string | null>(null);
   const [formLocationNote, setFormLocationNote] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   const editing = Boolean(form.id);
 
@@ -510,13 +512,25 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-forest">{t("app.photo")}</p>
               <p className="mt-0.5 text-[0.62rem] text-stone">
-                JPG, PNG or WebP · up to 5 MB. One clear photo helps farmers recognise the tractor.
+                Camera or gallery photo · up to 10 MB. One clear photo helps farmers recognise the tractor.
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <input
+                  ref={cameraRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void uploadPhoto(file);
+                    event.target.value = "";
+                  }}
+                />
+                <input
                   ref={fileRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/avif"
+                  accept="image/*"
                   className="hidden"
                   onChange={(event) => {
                     const file = event.target.files?.[0];
@@ -526,14 +540,23 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
                 />
                 <button
                   type="button"
+                  onClick={() => cameraRef.current?.click()}
+                  disabled={uploading}
+                  className={buttonStyles("outline", "sm")}
+                >
+                  <Camera className="size-3.5 text-forest" />
+                  Take Photo
+                </button>
+                <button
+                  type="button"
                   onClick={() => fileRef.current?.click()}
                   disabled={uploading}
                   className={buttonStyles("outline", "sm")}
                 >
                   {uploading ? (
-                    <Upload className="size-3.5 animate-pulse" />
+                    <Upload className="size-3.5 animate-pulse text-forest" />
                   ) : (
-                    <ImagePlus className="size-3.5" />
+                    <ImagePlus className="size-3.5 text-forest" />
                   )}
                   {uploading ? "Uploading…" : t("app.uploadPhoto")}
                 </button>

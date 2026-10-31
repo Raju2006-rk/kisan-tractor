@@ -67,16 +67,64 @@ export function getTractor(db: Database, tractorId: string): Tractor {
   return tractor;
 }
 
-export function getOwnerProfile(db: Database, ownerId: string): OwnerProfile {
-  const profile = db.ownerProfiles.find((p) => p.userId === ownerId);
-  if (!profile) throw new ServiceError("Owner profile not found.", 404);
+export function ensureOwnerProfile(db: Database, userId: string): OwnerProfile {
+  let profile = db.ownerProfiles.find((p) => p.userId === userId);
+  if (!profile) {
+    const user = db.users.find((u) => u.id === userId);
+    const farmer = db.farmerProfiles.find((p) => p.userId === userId);
+    profile = {
+      userId,
+      address: farmer?.address || "",
+      village: farmer?.village || "",
+      district: farmer?.district || "Nashik",
+      state: farmer?.state || "Maharashtra",
+      pincode: farmer?.pincode || "",
+      lat: farmer?.lat || 20.0,
+      lng: farmer?.lng || 73.8,
+      online: true,
+      serviceRadiusKm: 15,
+      payment: {
+        shareUpi: false,
+        upiId: "",
+        shareQr: false,
+        qrImage: "",
+        shareBank: false,
+        bankAccountName: user?.name || "Tractor Owner",
+        bankAccountNumber: "",
+        bankIfsc: "",
+        preferredMethod: "cash",
+      },
+    };
+    db.ownerProfiles.push(profile);
+  }
   return profile;
 }
 
-export function getFarmerProfile(db: Database, farmerId: string): FarmerProfile {
-  const profile = db.farmerProfiles.find((p) => p.userId === farmerId);
-  if (!profile) throw new ServiceError("Farmer profile not found.", 404);
+export function ensureFarmerProfile(db: Database, userId: string): FarmerProfile {
+  let profile = db.farmerProfiles.find((p) => p.userId === userId);
+  if (!profile) {
+    const owner = db.ownerProfiles.find((p) => p.userId === userId);
+    profile = {
+      userId,
+      address: owner?.address || "",
+      village: owner?.village || "",
+      district: owner?.district || "Nashik",
+      state: owner?.state || "Maharashtra",
+      pincode: owner?.pincode || "",
+      lat: owner?.lat || 20.0,
+      lng: owner?.lng || 73.8,
+    };
+    db.farmerProfiles.push(profile);
+  }
   return profile;
+}
+
+export function getOwnerProfile(db: Database, ownerId: string): OwnerProfile {
+  return ensureOwnerProfile(db, ownerId);
+}
+
+export function getFarmerProfile(db: Database, farmerId: string): FarmerProfile {
+  return ensureFarmerProfile(db, farmerId);
 }
 
 export function bookingPartyIds(booking: Booking, db: Database): {
@@ -1248,8 +1296,7 @@ export async function updateOwnerOnlineStatus(
   online: boolean,
 ): Promise<OwnerProfile> {
   return mutateDb((db) => {
-    const profile = db.ownerProfiles.find((p) => p.userId === userId);
-    if (!profile) throw new ServiceError("Owner profile not found.", 404);
+    const profile = ensureOwnerProfile(db, userId);
     profile.online = Boolean(online);
     return profile;
   });
@@ -1284,8 +1331,7 @@ export async function updateOwnerPaymentDetails(
     }
   }
   return mutateDb((db) => {
-    const profile = db.ownerProfiles.find((p) => p.userId === userId);
-    if (!profile) throw new ServiceError("Owner profile not found.", 404);
+    const profile = ensureOwnerProfile(db, userId);
     profile.payment = {
       shareUpi: Boolean(input.shareUpi),
       upiId: input.shareUpi ? input.upiId.trim() : "",
@@ -1340,7 +1386,10 @@ export async function updateUserProfile(
     }
     const farmerProfile = db.farmerProfiles.find((p) => p.userId === userId);
     const ownerProfile = db.ownerProfiles.find((p) => p.userId === userId);
-    const profile = farmerProfile ?? ownerProfile;
+    const profile =
+      user.role === "owner"
+        ? (ownerProfile ?? ensureOwnerProfile(db, userId))
+        : (farmerProfile ?? ensureFarmerProfile(db, userId));
     if (profile) {
       if (input.village !== undefined) {
         const village = input.village.trim().slice(0, 80);
@@ -1368,7 +1417,7 @@ export async function updateUserProfile(
       // Document verification is an owner-only feature. Ignore the field for
       // farmers so a stale client or direct API call cannot store documents on
       // a farmer profile.
-      if (input.documents && ownerProfile) {
+      if (input.documents && (ownerProfile || user.role === "owner")) {
         const docs: UserDocuments = profile.documents ?? {
           dlStatus: "not_provided",
           rcStatus: "not_provided",
@@ -1376,7 +1425,12 @@ export async function updateUserProfile(
         const cleanUpload = (value: string | null | undefined, label: string) => {
           const trimmed = (value ?? "").trim();
           if (!trimmed) return "";
-          if (!trimmed.startsWith("/uploads/")) {
+          if (
+            !trimmed.startsWith("/uploads/") &&
+            !trimmed.startsWith("http://") &&
+            !trimmed.startsWith("https://") &&
+            !trimmed.startsWith("data:image/")
+          ) {
             throw new ServiceError(`Please upload a valid ${label} image.`, 400);
           }
           return trimmed;
@@ -1481,8 +1535,7 @@ export async function saveTractor(
     throw new ServiceError("Please select at least one equipment.", 400);
   }
   return mutateDb((db) => {
-    const ownerProfile = db.ownerProfiles.find((p) => p.userId === userId);
-    if (!ownerProfile) throw new ServiceError("Owner profile not found.", 404);
+    const ownerProfile = ensureOwnerProfile(db, userId);
     let tractor: Tractor;
     if (input.id) {
       const found = db.tractors.find(
