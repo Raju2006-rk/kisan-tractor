@@ -4,7 +4,7 @@
 
 A mobile-first marketplace that connects farmers in Nashik, Maharashtra with nearby tractor owners. Farmers search local tractors, book one for themselves or someone else, and pay the owner **directly**. KisanTractor holds no money and takes no commission.
 
-The product includes a 3D scrolling landing page, OTP login, separate farmer and owner dashboards, tractor listings with equipment and rates, a multi-step booking flow, a full booking lifecycle with work tracking, automatic final billing, owner-marked direct payments, live farmer GPS tracking for the owner, disputes, notifications, and all 22 scheduled Indian languages.
+The product includes a responsive landing page, phone OTP login with trusted-device re-login, separate farmer and owner dashboards, tractor listings with equipment and rates, a multi-step booking flow, a full booking lifecycle with work tracking, automatic final billing, owner-marked direct payments, live farmer GPS tracking for the owner, disputes, notifications, and all 22 scheduled Indian languages.
 
 ---
 
@@ -17,7 +17,9 @@ KisanTractor is a **full-stack Next.js 16 application** featuring server-side AP
 ### Deploy in 60 Seconds on Vercel (Free)
 1. Click the button above or visit [vercel.com](https://vercel.com).
 2. Sign in with GitHub and select the **`Raju2006-rk/kisan-tractor`** repository.
-3. Click **Deploy**. Vercel will automatically build and launch the live site with working API endpoints and database functionality.
+3. Create a Supabase project, run [`supabase/app_state.sql`](supabase/app_state.sql) in the SQL editor, and enable Phone Auth with an SMS provider.
+4. Add the environment variables from [`.env.example`](.env.example) in **Project → Settings → Environment Variables**.
+5. Click **Deploy**. Vercel will build and launch the live site with working API endpoints and database functionality.
 
 ---
 
@@ -25,27 +27,21 @@ KisanTractor is a **full-stack Next.js 16 application** featuring server-side AP
 
 ```bash
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-### Demo accounts
+The app starts with an **empty database**: there are no preloaded users, tractors or bookings. Register with a real mobile number, then add a tractor from the owner dashboard.
 
-| Role | Name | Mobile | Notes |
-| --- | --- | --- | --- |
-| Farmer | Amit Patil | `9876546312` | Has active and upcoming bookings |
-| Owner | Ramesh Shinde | `9876500248` | Owns a Mahindra 575 DI, online |
+### Sign-in behaviour
 
-The demo OTP is always **`123456`**. The auth screen also has one-click demo login buttons.
+- **New user:** enter a mobile number, choose farmer or tractor owner, and verify the 6-digit OTP.
+- **Returning user on the same browser:** enter the mobile number only. The signed `kt_device` cookie proves this browser completed an OTP before, so the app signs in and redirects to the dashboard.
+- **Returning user on a new browser/device:** the OTP is required again, then that device is trusted.
 
-Demo data is generated relative to the current date and can be restored at any time:
-
-```bash
-curl -X POST http://localhost:3000/api/demo/reset
-```
-
-or use **Reset demo data** in the app sidebar.
+Production uses Supabase Auth phone OTP. Local development without Supabase credentials generates a random development OTP and shows it on the auth screen.
 
 ---
 
@@ -53,7 +49,7 @@ or use **Reset demo data** in the app sidebar.
 
 - **Next.js 16** (App Router, Route Handlers, server components)
 - **React 19**, **TypeScript**, **Tailwind CSS 4**
-- **Three.js / React Three Fiber / Drei** for the low-poly 3D tractor hero
+- **Supabase** for phone OTP auth and Postgres persistence
 - **Motion** for scroll and entrance animation
 - **Leaflet** for the nearby-tractor map
 - **SWR** for client data fetching and revalidation
@@ -65,13 +61,14 @@ or use **Reset demo data** in the app sidebar.
 ## What is implemented
 
 ### Marketplace and landing
-- Animated 3D tractor scene with scroll-linked camera and field.
+- Responsive hero with a real tractor photograph.
 - Nearby tractors pulled from the real API (not hardcoded cards).
 - How it works, services, direct-payment explanation, owner CTA, FAQ.
 - **IVR / keypad booking shown as “Coming soon”** — no fake phone number and no non-functional call button.
 
 ### Authentication and roles
-- Mobile OTP login with server-created sessions (HTTP-only cookie).
+- Phone OTP login through Supabase Auth, with server-created sessions (HTTP-only cookie).
+- Returning users on a trusted browser sign in with their phone number only; new devices still require an OTP.
 - The backend decides farmer vs owner from the user record and redirects to the right dashboard.
 - New users can register as a farmer or tractor owner; existing users keep their role.
 - Session expiry, logout, and role-based route protection.
@@ -117,7 +114,7 @@ Plus `REJECTED`, `CANCELLED_BY_FARMER`, `CANCELLED_BY_OWNER`, `EXPIRED`, and `DI
 
 ### Platform
 - English, Hindi, Marathi and all 22 scheduled Indian languages, with a scrollable language switcher, RTL support for Kashmiri/Sindhi/Urdu, persisted preference, and localized status/service labels. Missing translations fall back to English.
-- Auto-detect location from the device GPS on the profile screen; the nearest seeded village is selected and the exact coordinates are saved.
+- Auto-detect location from the device GPS on the profile screen; the nearest known village is selected and the exact coordinates are saved.
 - Live farmer GPS sharing on a booking, shown to the tractor owner on a Leaflet map with a **Go to farm land** Google Maps directions link.
 - Log out from either the profile screen or the sidebar/bottom navigation.
 - Desktop sidebar and mobile bottom navigation.
@@ -147,34 +144,37 @@ src/
   components/
     app/                   authenticated UI
     marketing/             landing page
-    three/                 R3F tractor scene
     ui/                    primitives, logo, photo
   lib/
     booking-service.ts     permissions, transitions, pricing, billing, audit
-    auth.ts                sessions and OTP
-    db.ts                  JSON store with serialized writes
-    seed.ts                demo data
+    auth.ts                sessions, trusted devices, OTP helpers
+    supabase.ts            server Supabase clients
+    db.ts                  Supabase app_state store with local fallback
+    initial-db.ts          empty starting database
     pricing.ts             shared amount calculations
     constants.ts           services, equipment, villages, status metadata
     i18n.tsx               translations
 supabase/
-  schema.sql               production schema, RLS, RPCs
+  app_state.sql            application state table (service role only)
+  schema.sql               normalized schema, RLS and RPC reference
 ```
 
-### Demo backend
+### Data and auth backend
 
-Because no Supabase credentials were provided, the demo uses a **server-side JSON store** at `data/db.json`. It is created on first request from `src/lib/seed.ts` and written through a serialized mutation queue.
+- **Auth:** Supabase Auth sends and verifies phone OTPs. The server never stores OTPs in production.
+- **Persistence:** the tested booking engine's database document is stored in the `public.app_state` row in Supabase Postgres, with optimistic version checks so concurrent writes cannot silently overwrite each other.
+- **Sessions:** signed, HTTP-only `kt_session` cookies (7 days). A separate signed `kt_device` cookie (365 days) marks a browser as trusted for phone-only re-login and is kept after logout.
+- **Local development:** without Supabase credentials, the app uses `data/db.json` and a development OTP. Production refuses to start without Supabase unless `ALLOW_LOCAL_DB=true`.
 
-Important: this is a real server backend, not `localStorage`. The browser never owns bookings, prices, statuses, or payments. All mutations go through `/api/*`, and the server remains authoritative. The JSON store is intended for demo/local use; `supabase/schema.sql` is the production path.
+The browser never owns bookings, prices, statuses, or payments. All mutations go through `/api/*`, and the server remains authoritative.
 
 ### API surface
 
 | Method | Route | Purpose |
 | --- | --- | --- |
-| POST | `/api/auth/request-otp` | Create an OTP challenge |
-| POST | `/api/auth/verify-otp` | Verify OTP, create session |
-| POST | `/api/auth/demo` | One-click demo login |
-| POST | `/api/auth/logout` | Destroy session |
+| POST | `/api/auth/request-otp` | Send OTP, or sign in a trusted device with the phone number only |
+| POST | `/api/auth/verify-otp` | Verify OTP, create session, trust this device |
+| POST | `/api/auth/logout` | Destroy session (keeps the trusted-device cookie) |
 | GET | `/api/auth/me` | Current session user |
 | GET | `/api/tractors` | Search nearby tractors (`owner=me` for own listings) |
 | POST | `/api/tractors` | Create an owner listing |
@@ -188,7 +188,6 @@ Important: this is a real server backend, not `localStorage`. The browser never 
 | PATCH | `/api/profile` | Name, village, address, service radius |
 | GET/PATCH | `/api/notifications` | List / mark read |
 | POST | `/api/upload` | Tractor and payment QR images |
-| POST | `/api/demo/reset` | Restore seed data |
 
 Booking actions accepted by `/api/bookings/[id]/actions`:
 
@@ -199,15 +198,18 @@ Booking actions accepted by `/api/bookings/[id]/actions`:
 ## Connecting Supabase
 
 1. Create a Supabase project.
-2. Enable phone/OTP auth (or keep the app’s OTP flow and store users in `profiles`).
-3. Run [`supabase/schema.sql`](supabase/schema.sql) in the SQL editor.
+2. Run [`supabase/app_state.sql`](supabase/app_state.sql) in the SQL editor.
+3. Enable Phone Auth under **Authentication → Providers** and configure an SMS provider.
 4. Copy `.env.example` to `.env.local` and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY` (server only)
-5. Replace the JSON store calls in `src/lib/booking-service.ts` with Supabase queries/RPCs. The SQL file already defines the booking RPCs, row-level security, constraints, and audit triggers that mirror the demo logic.
+   - `SESSION_SECRET` (long random string; required in production)
+5. Add the same variables to your Vercel project before deploying.
 
-The schema enforces the same rules as the demo:
+`app_state` has RLS enabled and no policies, so only the service role can read or write it. The normalized [`supabase/schema.sql`](supabase/schema.sql) remains in the repo as a reference migration for teams that later want row-per-entity tables and RPCs; the running app does not require it.
+
+The backend enforces the same rules as before:
 
 - Only farmers can create bookings; only the tractor owner can respond or run work.
 - A booking is blocked when the tractor already has an overlapping active booking.
@@ -225,7 +227,6 @@ The schema enforces the same rules as the demo:
 - Move uploads to Supabase Storage with signed URLs and image scanning.
 - Add database backups, monitoring, and error reporting.
 - Serve over HTTPS; keep `secure` cookies enabled (already the default in production).
-- Remove or disable `/api/demo/reset` (`ALLOW_DEMO_RESET` stays false).
 
 ---
 

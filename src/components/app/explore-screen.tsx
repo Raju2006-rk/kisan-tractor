@@ -38,7 +38,7 @@ const ExploreMap = dynamic(() => import("@/components/app/explore-map"), {
 
 type Sort = "nearest" | "price";
 
-/** How far a GPS reading may be from a seeded village and still be named. */
+/** How far a GPS reading may be from a known village and still be named. */
 const SERVICE_AREA_KM = 50;
 
 export function ExploreScreen({ user }: { user: SessionUser }) {

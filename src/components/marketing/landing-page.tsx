@@ -32,7 +32,6 @@ import {
 import { Logo } from "@/components/ui/logo";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { Photo } from "@/components/ui/photo";
-import { TractorSceneLoader } from "@/components/three/tractor-scene-loader";
 import { Badge, buttonStyles, Card, SectionHeading } from "@/components/ui/primitives";
 import { PHOTOS, PRICING_UNITS, SERVICES } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
@@ -197,7 +196,14 @@ function Hero() {
         >
           <div className="relative h-[360px] overflow-hidden rounded-[2rem] border border-forest/10 bg-[radial-gradient(120%_100%_at_80%_0%,#f4e6c6_0%,#e6dcc1_42%,#c9cfb4_100%)] shadow-[0_30px_70px_-40px_rgba(22,59,42,0.55)] sm:h-[430px] lg:h-[500px]">
             <div className="absolute inset-0">
-              <TractorSceneLoader />
+              <Photo
+                src={PHOTOS.heroTractor}
+                alt="Tractor working in a field"
+                className="h-full w-full"
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                priority
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#102b1e]/55 via-transparent to-transparent" />
             </div>
             <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-4 sm:p-5">
               <span className="rounded-full border border-forest/10 bg-paper/80 px-3 py-1.5 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-forest backdrop-blur">
@@ -205,20 +211,20 @@ function Hero() {
               </span>
               <span className="flex items-center gap-1.5 rounded-full border border-forest/10 bg-paper/80 px-3 py-1.5 text-[0.65rem] font-semibold text-forest backdrop-blur">
                 <span className="size-1.5 rounded-full bg-forest pulse-ring" />
-                Available today
+                Local owners
               </span>
             </div>
             <div className="pointer-events-none absolute bottom-4 left-4 right-4 flex flex-wrap items-end justify-between gap-2 sm:bottom-5 sm:left-5 sm:right-5">
               <div className="rounded-2xl border border-forest/10 bg-paper/85 px-3.5 py-2.5 backdrop-blur">
                 <p className="text-[0.6rem] font-bold uppercase tracking-[0.16em] text-stone">
-                  Mahindra 575 DI
+                  Local tractor
                 </p>
                 <p className="mt-0.5 text-xs font-semibold text-forest">
-                  ₹800 / hour · Ramesh Shinde
+                  Hourly, per acre or per trip
                 </p>
               </div>
               <div className="hidden items-center gap-1.5 rounded-full bg-forest px-3 py-2 text-[0.65rem] font-semibold text-cream sm:flex">
-                <MapPin className="size-3" /> 2.4 km away
+                <MapPin className="size-3" /> Nearby
               </div>
             </div>
           </div>
@@ -480,7 +486,7 @@ function TractorCard({ tractor, priority = false }: { tractor: TractorWithOwner;
 function NearbyTractors() {
   const { t } = useI18n();
   const { data, isLoading } = useSWR<{ tractors: TractorWithOwner[] }>(
-    // Niphad, Nashik — the seed service area shown in the section heading.
+    // Niphad, Nashik — the service area shown in the section heading.
     "/api/tractors?lat=20.0833&lng=73.9333",
   );
   const tractors = data?.tractors?.slice(0, 3) ?? [];
@@ -569,7 +575,7 @@ function DirectPayment() {
             </div>
             <div className="mt-4 space-y-2 rounded-2xl bg-cream/80 p-3.5 text-xs">
               <div className="flex items-center justify-between">
-                <span className="text-stone">Ploughing · Mahindra 575 DI</span>
+                <span className="text-stone">Ploughing · 50 HP tractor</span>
                 <span className="font-semibold text-forest">₹800 / hour</span>
               </div>
               <div className="flex items-center justify-between">
@@ -628,15 +634,15 @@ function OwnerSection() {
           />
           <div className="absolute bottom-5 left-5 right-5 rounded-2xl border border-cream/20 bg-forest/85 p-4 text-cream backdrop-blur">
             <p className="text-[0.6rem] font-bold uppercase tracking-[0.18em] text-wheat">
-              Ramesh Shinde · Niphad
+              Tractor owner · Niphad, Nashik
             </p>
             <p className="mt-1 font-display text-xl">
               “My tractor, my rates. The farmer pays me directly.”
             </p>
             <div className="mt-2 flex items-center gap-3 text-[0.65rem] text-cream/65">
-              <span>50 HP Mahindra 575 DI</span>
+              <span>50 HP tractor</span>
               <span className="size-1 rounded-full bg-cream/30" />
-              <span>₹42,600 recorded this month</span>
+              <span>Direct payments, no commission</span>
             </div>
           </div>
         </div>

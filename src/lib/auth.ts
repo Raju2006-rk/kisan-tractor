@@ -1,10 +1,12 @@
 import { cookies } from "next/headers";
 import {
   createHmac,
+  randomInt,
   randomUUID,
   timingSafeEqual,
 } from "crypto";
 import { mutateDb, getDb } from "./db";
+import { getSupabaseAuth, isSupabaseAuthConfigured } from "./supabase";
 import type {
   FarmerProfile,
   Language,
@@ -15,22 +17,30 @@ import type {
 } from "./types";
 
 export const SESSION_COOKIE = "kt_session";
+const DEVICE_COOKIE = "kt_device";
 const SESSION_DAYS = 7;
+const DEVICE_DAYS = 365;
 const SESSION_TTL_MS = SESSION_DAYS * 24 * 60 * 60 * 1000;
-export const DEMO_OTP = "123456";
+const DEVICE_TTL_MS = DEVICE_DAYS * 24 * 60 * 60 * 1000;
 
 /**
  * Sessions are signed, self-contained cookies instead of database rows.
  * Vercel (and other serverless hosts) run each request on an isolated
- * instance with its own ephemeral filesystem, so a session written during
- * login is not guaranteed to be readable by the page render that follows.
- * A signed token keeps login working across instances. Set SESSION_SECRET
- * in production to replace the demo fallback.
+ * instance, so a session written during login is not guaranteed to be readable
+ * by the page render that follows. A signed token keeps login working across
+ * instances. SESSION_SECRET is required in production.
  */
-const SESSION_SECRET =
-  process.env.SESSION_SECRET ||
-  process.env.AUTH_SECRET ||
-  "kisantractor-demo-session-secret-v1";
+function sessionSecret(): string {
+  const secret =
+    process.env.SESSION_SECRET?.trim() || process.env.AUTH_SECRET?.trim() || "";
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("SESSION_SECRET is required in production.");
+    }
+    return "kisantractor-local-development-secret";
+  }
+  return secret;
+}
 
 type SessionTokenPayload = {
   userId: string;
@@ -41,7 +51,7 @@ type SessionTokenPayload = {
 };
 
 function signPayload(payload: string): string {
-  return createHmac("sha256", SESSION_SECRET).update(payload).digest("base64url");
+  return createHmac("sha256", sessionSecret()).update(payload).digest("base64url");
 }
 
 function encodeSessionToken(
@@ -97,6 +107,57 @@ function decodeSessionToken(token: string): SessionTokenPayload | null {
   }
 }
 
+type DeviceTokenPayload = {
+  userId: string;
+  mobile: string;
+  exp: number;
+};
+
+function encodeDeviceToken(userId: string, mobile: string): string {
+  const payload: DeviceTokenPayload = {
+    userId,
+    mobile,
+    exp: Date.now() + DEVICE_TTL_MS,
+  };
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${encoded}.${signPayload(encoded)}`;
+}
+
+function decodeDeviceToken(token: string): DeviceTokenPayload | null {
+  const separator = token.lastIndexOf(".");
+  if (separator <= 0) return null;
+  const encoded = token.slice(0, separator);
+  const signature = token.slice(separator + 1);
+  const provided = Buffer.from(signature);
+  const wanted = Buffer.from(signPayload(encoded));
+  if (
+    provided.length !== wanted.length ||
+    !timingSafeEqual(provided, wanted)
+  ) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(encoded, "base64url").toString("utf8"),
+    ) as Partial<DeviceTokenPayload>;
+    if (
+      typeof parsed.userId !== "string" ||
+      typeof parsed.mobile !== "string" ||
+      typeof parsed.exp !== "number" ||
+      parsed.exp < Date.now()
+    ) {
+      return null;
+    }
+    return {
+      userId: parsed.userId,
+      mobile: parsed.mobile,
+      exp: parsed.exp,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function normalizeMobile(input: string): string {
   const digits = input.replace(/\D/g, "");
   if (digits.length === 12 && digits.startsWith("91")) return digits.slice(2);
@@ -134,9 +195,9 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const snapOwner = decoded?.ownerProfile;
 
   // The signed cookie carries the last profile values this user saved. Prefer
-  // them over the per-instance JSON store, which is re-seeded on every fresh
-  // serverless instance and would otherwise revert saved villages and
-  // auto-detected coordinates. Sensitive fields stay in the store only.
+  // them over the stored record so a read that races a write cannot revert a
+  // saved village or auto-detected coordinates. Sensitive fields stay in the
+  // store only.
   const farmerProfile: FarmerProfile | undefined = snapFarmer
     ? {
         ...(dbFarmer ?? {}),
@@ -216,8 +277,8 @@ export async function createSession(userId: string): Promise<string> {
 }
 
 /**
- * Re-issue the signed cookie after a profile write so the saved values survive
- * on a different serverless instance (which only has the seed JSON store).
+ * Re-issue the signed cookie after a profile write so the latest saved values
+ * are available to the next request.
  */
 export async function refreshSession(userId: string): Promise<void> {
   const jar = await cookies();
@@ -232,11 +293,82 @@ export async function destroySession(): Promise<void> {
   jar.delete(SESSION_COOKIE);
 }
 
+/** True when a local development OTP may be generated instead of sending SMS. */
+export function isDevOtpEnabled(): boolean {
+  if (isSupabaseAuthConfigured()) return false;
+  if (process.env.AUTH_DEV_OTP === "true") return true;
+  if (process.env.AUTH_DEV_OTP === "false") return false;
+  return process.env.NODE_ENV !== "production";
+}
+
+/** Remember this browser so the next login only needs the phone number. */
+export async function rememberDevice(user: User): Promise<void> {
+  const jar = await cookies();
+  jar.set(DEVICE_COOKIE, encodeDeviceToken(user.id, user.mobile), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: DEVICE_DAYS * 24 * 60 * 60,
+  });
+}
+
+/** Check the trusted-device cookie without revealing why it failed. */
+export async function isTrustedDevice(
+  userId: string,
+  mobile: string,
+): Promise<boolean> {
+  const jar = await cookies();
+  const token = jar.get(DEVICE_COOKIE)?.value;
+  if (!token) return false;
+  const decoded = decodeDeviceToken(token);
+  return Boolean(
+    decoded && decoded.userId === userId && decoded.mobile === mobile,
+  );
+}
+
+/** Send a real phone OTP through Supabase Auth. */
+export async function sendSupabaseOtp(mobile: string): Promise<void> {
+  const supabase = getSupabaseAuth();
+  const { error } = await supabase.auth.signInWithOtp({
+    phone: `+91${mobile}`,
+    options: { shouldCreateUser: true },
+  });
+  if (error) {
+    throw new Error(
+      error.message || "Could not send the OTP. Please try again.",
+    );
+  }
+}
+
+/** Verify a Supabase phone OTP and return the Supabase user id. */
+export async function verifySupabaseOtp(
+  mobile: string,
+  token: string,
+): Promise<{ supabaseUserId: string } | { error: string }> {
+  const supabase = getSupabaseAuth();
+  const { data, error } = await supabase.auth.verifyOtp({
+    phone: `+91${mobile}`,
+    token,
+    type: "sms",
+  });
+  if (error || !data.user) {
+    return {
+      error: error?.message || "That OTP is not valid. Please try again.",
+    };
+  }
+  return { supabaseUserId: data.user.id };
+}
+
+/** Development-only OTP. Never used when Supabase Auth is configured. */
 export async function createOtpChallenge(
   mobile: string,
   role: Role | null,
 ): Promise<{ otp: string; expiresAt: string }> {
-  const otp = DEMO_OTP;
+  if (!isDevOtpEnabled()) {
+    throw new Error("Development OTPs are disabled.");
+  }
+  const otp = String(randomInt(100000, 1000000));
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
   await mutateDb((db) => {
     db.otpChallenges = db.otpChallenges.filter(
@@ -275,6 +407,7 @@ export async function verifyOtpChallenge(
 }
 
 export async function findOrCreateUser(input: {
+  id?: string;
   mobile: string;
   name?: string;
   role?: Role;
@@ -284,7 +417,7 @@ export async function findOrCreateUser(input: {
   const existing = db.users.find((u) => u.mobile === input.mobile);
   if (existing) return { user: existing, isNew: false };
   const role: Role = input.role === "owner" ? "owner" : "farmer";
-  const userId = `usr_${randomUUID()}`;
+  const userId = input.id || `usr_${randomUUID()}`;
   const now = new Date().toISOString();
   const user: User = {
     id: userId,

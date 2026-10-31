@@ -286,7 +286,7 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
                     <Input
                       value={bankAccountName}
                       onChange={(event) => setBankAccountName(event.target.value)}
-                      placeholder="Ramesh Shinde"
+                      placeholder="Account holder name"
                       autoComplete="off"
                     />
                   </Field>

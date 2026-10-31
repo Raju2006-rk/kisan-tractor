@@ -41,7 +41,7 @@ import { useI18n } from "@/lib/i18n";
 import type { Language, SessionUser } from "@/lib/types";
 import { cn, formatDate, haversineKm, maskMobile } from "@/lib/utils";
 
-/** Match a GPS reading to the closest seeded service village. */
+/** Match a GPS reading to the closest known service village. */
 function nearestVillage(lat: number, lng: number) {
   return VILLAGES.reduce((best, village) => {
     const distance = haversineKm({ lat, lng }, village);
@@ -49,7 +49,7 @@ function nearestVillage(lat: number, lng: number) {
   }, { village: VILLAGES[0], distance: Number.POSITIVE_INFINITY });
 }
 
-/** How far a GPS reading may be from a seeded village and still be saved. */
+/** How far a GPS reading may be from a known village and still be saved. */
 const SERVICE_AREA_KM = 50;
 
 export function ProfileScreen({ user }: { user: SessionUser }) {
@@ -130,7 +130,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
         const lng = Math.round(position.coords.longitude * 10000) / 10000;
         const match = nearestVillage(lat, lng);
         setLocating(false);
-        // Only snap to a seeded village when the reading is inside the
+        // Only snap to a known village when the reading is inside the
         // supported service area. Farther readings are reported but not saved,
         // so a farmer outside Nashik keeps a usable saved village.
         if (match.distance <= SERVICE_AREA_KM) {

@@ -340,7 +340,7 @@ export default async function TractorDetailPage({
                   ) : (
                     <>
                       You are signed in as a tractor owner. Booking requests are sent by farmers.
-                      Switch to the farmer demo account to try the booking flow.
+                      Sign in with a farmer account to book this tractor.
                     </>
                   )}
                 </div>

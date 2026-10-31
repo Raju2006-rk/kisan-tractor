@@ -74,7 +74,7 @@ const pricingIcons: Record<PricingType, typeof Clock3> = {
   trip: Truck,
 };
 
-/** How far a GPS reading may be from a seeded village and still be named. */
+/** How far a GPS reading may be from a known village and still be named. */
 const SERVICE_AREA_KM = 50;
 
 const steps = [
@@ -361,7 +361,7 @@ export function BookingWizard({
             (village) => village.name.toLowerCase() === villageName.trim().toLowerCase(),
           );
         // Keep a typed village name when the reading is outside the area the
-        // seeded villages cover; the GPS coordinates are still used.
+        // known villages cover; the GPS coordinates are still used.
         if (!isCustomVillage && nearest.distance <= SERVICE_AREA_KM) {
           setVillageName(nearest.village.name);
         }

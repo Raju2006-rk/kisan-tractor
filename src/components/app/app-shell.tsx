@@ -13,7 +13,6 @@ import {
   LogOut,
   MapPin,
   Power,
-  RotateCcw,
   Tractor,
   UserRound,
   Volume2,
@@ -48,7 +47,6 @@ export function AppShell({
   const { push } = useToast();
   const [online, setOnline] = useState(user.ownerProfile?.online ?? false);
   const [statusLoading, setStatusLoading] = useState(false);
-  const [resetting, setResetting] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
   const seenNotificationIds = useRef<Set<string> | null>(null);
   const { data } = useSWR<{ notifications: Notification[]; unread: number }>(
@@ -160,19 +158,6 @@ export function AppShell({
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/");
     router.refresh();
-  }
-
-  async function resetDemo() {
-    setResetting(true);
-    try {
-      const response = await fetch("/api/demo/reset", { method: "POST" });
-      if (!response.ok) throw new Error("Could not reset demo data.");
-      push("Demo data restored. Reloading…", "success");
-      window.setTimeout(() => window.location.reload(), 700);
-    } catch (error) {
-      push(error instanceof Error ? error.message : "Could not reset demo data.", "error");
-      setResetting(false);
-    }
   }
 
   const unread = data?.unread ?? 0;
@@ -301,14 +286,6 @@ export function AppShell({
           </div>
           <button
             type="button"
-            onClick={resetDemo}
-            disabled={resetting}
-            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[0.65rem] font-medium text-cream/40 transition hover:text-cream/75 disabled:opacity-50"
-          >
-            <RotateCcw className={cn("size-3", resetting && "animate-spin")} /> Reset demo data
-          </button>
-          <button
-            type="button"
             onClick={logout}
             className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[0.7rem] font-semibold text-cream/55 transition hover:text-cream"
           >
@@ -380,7 +357,7 @@ export function AppShell({
                   disabled={statusLoading}
                   title={online ? "Online for new requests" : "Offline for new requests"}
                   className={cn(
-                    "hidden items-center gap-2 rounded-full border px-2.5 py-1.5 text-[0.65rem] font-semibold transition sm:flex disabled:opacity-60",
+                    "flex items-center gap-2 rounded-full border px-2.5 py-1.5 text-[0.65rem] font-semibold transition disabled:opacity-60",
                     online
                       ? "border-forest/20 bg-forest/8 text-forest"
                       : "border-line bg-paper text-stone",

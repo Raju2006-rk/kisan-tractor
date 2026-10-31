@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  Loader2,
   LockKeyhole,
   ShieldCheck,
   Smartphone,
@@ -37,10 +36,9 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
   const [otp, setOtp] = useState("");
   const [isExisting, setIsExisting] = useState(false);
   const [existingName, setExistingName] = useState<string | null>(null);
-  const [demoOtp, setDemoOtp] = useState<string | null>(null);
+  const [devOtp, setDevOtp] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [demoLoading, setDemoLoading] = useState<Role | null>(null);
   const [error, setError] = useState<string | null>(null);
   const otpRef = useRef<HTMLInputElement>(null);
 
@@ -68,13 +66,20 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
       });
       const data = (await response.json()) as {
         error?: string;
-        demoOtp?: string;
+        signedIn?: boolean;
+        devOtp?: string;
         isExisting?: boolean;
         name?: string | null;
         role?: Role | null;
       };
       if (!response.ok) throw new Error(data.error ?? "Could not send the OTP.");
-      setDemoOtp(data.demoOtp ?? null);
+      if (data.signedIn) {
+        push("Welcome back. Signing you in…", "success");
+        router.push("/dashboard");
+        router.refresh();
+        return;
+      }
+      setDevOtp(data.devOtp ?? null);
       setIsExisting(Boolean(data.isExisting));
       setExistingName(data.name ?? null);
       if (data.role) setRole(data.role);
@@ -106,27 +111,6 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
     } catch (verifyError) {
       setError(verifyError instanceof Error ? verifyError.message : "Could not verify this OTP.");
       setLoading(false);
-    }
-  }
-
-  async function demoLogin(demoRole: Role) {
-    setDemoLoading(demoRole);
-    setError(null);
-    try {
-      const response = await fetch("/api/auth/demo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: demoRole }),
-      });
-      if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error ?? "Demo login failed.");
-      }
-      router.push("/dashboard");
-      router.refresh();
-    } catch (demoError) {
-      setError(demoError instanceof Error ? demoError.message : "Demo login failed.");
-      setDemoLoading(null);
     }
   }
 
@@ -237,7 +221,7 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
                     id="name"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    placeholder={role === "owner" ? "Ramesh Shinde" : "Amit Patil"}
+                    placeholder="Your full name"
                     autoComplete="name"
                   />
                 </Field>
@@ -283,7 +267,7 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
                     id="name-otp"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    placeholder={role === "owner" ? "Ramesh Shinde" : "Amit Patil"}
+                    placeholder="Your full name"
                     autoComplete="name"
                   />
                 </Field>
@@ -303,15 +287,15 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
                 />
               </Field>
 
-              {demoOtp ? (
+              {devOtp ? (
                 <div className="flex items-center justify-between gap-3 rounded-2xl border border-wheat/70 bg-wheat/20 px-4 py-3">
                   <div>
                     <p className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-[#7a5a1d]">
-                      {t("auth.otpDemo")}
+                      {t("auth.otpDev")}
                     </p>
-                    <p className="font-display text-xl tracking-[0.2em] text-forest">{demoOtp}</p>
+                    <p className="font-display text-xl tracking-[0.2em] text-forest">{devOtp}</p>
                   </div>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setOtp(demoOtp)}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setOtp(devOtp)}>
                     {t("auth.otpAutofill")}
                   </Button>
                 </div>
@@ -335,7 +319,7 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
                   disabled={seconds > 0 || loading}
                   className="font-semibold text-forest disabled:text-stone/50"
                 >
-                  {t("auth.resend")}
+                  {t("auth.resendNow")}
                 </button>
               </div>
 
@@ -345,41 +329,6 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
               </p>
             </form>
           )}
-
-          <div className="mt-7 rounded-2xl border border-dashed border-line bg-paper/60 p-4">
-            <p className="text-[0.62rem] font-bold uppercase tracking-[0.16em] text-stone">
-              {t("auth.demoTitle")}
-            </p>
-            <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => demoLogin("farmer")}
-                disabled={demoLoading !== null}
-                className="flex items-center justify-center gap-2 rounded-xl border border-forest/15 bg-cream px-3 py-2.5 text-[0.7rem] font-semibold text-forest transition hover:border-forest/35 disabled:opacity-60"
-              >
-                {demoLoading === "farmer" ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <UserRound className="size-3.5" />
-                )}
-                {t("auth.demoFarmer")}
-              </button>
-              <button
-                type="button"
-                onClick={() => demoLogin("owner")}
-                disabled={demoLoading !== null}
-                className="flex items-center justify-center gap-2 rounded-xl border border-forest/15 bg-cream px-3 py-2.5 text-[0.7rem] font-semibold text-forest transition hover:border-forest/35 disabled:opacity-60"
-              >
-                {demoLoading === "owner" ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Tractor className="size-3.5" />
-                )}
-                {t("auth.demoOwner")}
-              </button>
-            </div>
-            <p className="mt-2 text-[0.62rem] text-stone/70">{t("auth.demoNote")}</p>
-          </div>
         </div>
 
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 border-t border-line/70 py-4 text-[0.62rem] text-stone">
@@ -411,18 +360,18 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
             </p>
             <div className="mt-6 flex items-center gap-3">
               <span className="flex size-11 items-center justify-center rounded-full bg-wheat font-display text-sm font-semibold text-forest">
-                RS
+                <Tractor className="size-5" />
               </span>
               <div>
-                <p className="text-sm font-semibold text-cream">Ramesh Shinde</p>
-                <p className="text-xs text-cream/55">Tractor owner · Niphad, Nashik</p>
+                <p className="text-sm font-semibold text-cream">A local tractor owner</p>
+                <p className="text-xs text-cream/55">Niphad, Nashik</p>
               </div>
             </div>
             <div className="mt-8 grid grid-cols-3 gap-3">
               {[
                 { value: "₹0", label: "Commission" },
                 { value: "Direct", label: "Farmer → owner" },
-                { value: "3", label: "Languages" },
+                { value: "22", label: "Languages" },
               ].map((stat) => (
                 <div key={stat.label} className="rounded-2xl border border-cream/12 bg-cream/5 px-3 py-3 backdrop-blur">
                   <p className="font-display text-xl text-cream">{stat.value}</p>

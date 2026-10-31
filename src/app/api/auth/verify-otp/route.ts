@@ -4,10 +4,13 @@ import {
   findOrCreateUser,
   isValidMobile,
   normalizeMobile,
+  rememberDevice,
   verifyOtpChallenge,
+  verifySupabaseOtp,
 } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { handleApiError, jsonError, readJson } from "@/lib/http";
+import { isSupabaseAuthConfigured } from "@/lib/supabase";
 import type { Language, Role } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -27,26 +30,43 @@ export async function POST(request: Request) {
     if (otp.length !== 6) {
       return jsonError("Enter the 6-digit sign-in OTP.", 400);
     }
-    const verified = await verifyOtpChallenge(mobile, otp);
-    if (!verified.ok) {
-      return jsonError(verified.reason ?? "Could not verify this OTP.", 400);
+
+    let supabaseUserId: string | undefined;
+    if (isSupabaseAuthConfigured()) {
+      const verified = await verifySupabaseOtp(mobile, otp);
+      if ("error" in verified) {
+        return jsonError(verified.error, 400);
+      }
+      supabaseUserId = verified.supabaseUserId;
+    } else {
+      const verified = await verifyOtpChallenge(mobile, otp);
+      if (!verified.ok) {
+        return jsonError(verified.reason ?? "Could not verify this OTP.", 400);
+      }
     }
+
     const db = await getDb();
     const existing = db.users.find((u) => u.mobile === mobile);
     const role: Role = existing?.role ?? (body.role === "owner" ? "owner" : "farmer");
     const { user, isNew } = await findOrCreateUser({
+      id: supabaseUserId,
       mobile,
       name: body.name,
       role,
       language: body.language ?? "en",
     });
+
     await createSession(user.id);
+    await rememberDevice(user);
+
     const fresh = await getDb();
     const profile =
       fresh.farmerProfiles.find((p) => p.userId === user.id) ??
       fresh.ownerProfiles.find((p) => p.userId === user.id);
+
     return NextResponse.json({
       ok: true,
+      signedIn: true,
       isNew,
       user: { ...user, profile },
     });

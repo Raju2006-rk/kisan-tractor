@@ -1,0 +1,31 @@
+-- ============================================================================
+-- KisanTractor — application state table
+-- ----------------------------------------------------------------------------
+-- Run this file once in the Supabase SQL editor (or `supabase db push`).
+--
+-- The Next.js server stores the booking engine's database document in this
+-- single row. The table is service-role only: RLS is enabled and no policies
+-- are granted, so the anon and authenticated keys can never read or write it.
+-- Only the server (SUPABASE_SERVICE_ROLE_KEY) has access.
+-- ============================================================================
+
+create table if not exists public.app_state (
+  id text primary key,
+  data jsonb not null default '{}'::jsonb,
+  version bigint not null default 1,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.app_state enable row level security;
+
+revoke all on public.app_state from anon, authenticated;
+grant all on public.app_state to service_role;
+
+-- The server creates the "main" row on first use. This insert makes the row
+-- available immediately after running the migration.
+insert into public.app_state (id, data, version)
+values ('main', '{}'::jsonb, 1)
+on conflict (id) do nothing;
+
+comment on table public.app_state is
+  'Single-row document store for the KisanTractor server. Service role only.';

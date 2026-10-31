@@ -40,7 +40,7 @@ import { cn, haversineKm } from "@/lib/utils";
 
 type TractorStatus = "active" | "maintenance" | "inactive";
 
-/** How far a GPS reading may be from a seeded village and still be adopted. */
+/** How far a GPS reading may be from a known village and still be adopted. */
 const SERVICE_AREA_KM = 50;
 
 type TractorForm = {
@@ -209,7 +209,7 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
           },
           { village: VILLAGES[0], distance: Number.POSITIVE_INFINITY },
         );
-        // Only adopt a seeded village name when the reading is inside the
+        // Only adopt a known village name when the reading is inside the
         // supported service area; otherwise keep the owner's typed village.
         if (nearest.distance <= SERVICE_AREA_KM) {
           update("village", nearest.village.name);
