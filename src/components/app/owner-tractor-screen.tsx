@@ -113,15 +113,14 @@ function formFromTractor(tractor: TractorWithOwner): TractorForm {
   };
 }
 
-function statusLabel(status: TractorStatus) {
-  if (status === "maintenance") return "Under maintenance";
-  if (status === "inactive") return "Hidden from farmers";
-  return "Active";
-}
-
 export function OwnerTractorScreen({ user }: { user: SessionUser }) {
   const { t } = useI18n();
   const { push } = useToast();
+  const statusLabel = (status: TractorStatus) => {
+    if (status === "maintenance") return t("app.underMaintenanceLabel");
+    if (status === "inactive") return t("app.hiddenFromFarmers");
+    return t("common.active");
+  };
   const { data, isLoading, mutate } = useSWR<{ tractors: TractorWithOwner[] }>(
     "/api/tractors?owner=me",
   );
@@ -185,15 +184,11 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
     setFormLocationError(null);
     setFormLocationNote(null);
     if (typeof window !== "undefined" && !window.isSecureContext) {
-      setFormLocationError(
-        "Location detection needs a secure https connection. Open this site over https, or type your village instead.",
-      );
+      setFormLocationError(t("app.locationNeedsHttps"));
       return;
     }
     if (!navigator.geolocation) {
-      setFormLocationError(
-        "This browser cannot detect location. Choose or type your village instead.",
-      );
+      setFormLocationError(t("app.locationBrowserUnsupported"));
       return;
     }
     setLocating(true);
@@ -207,15 +202,18 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
         try {
           const geo = await reverseGeocode(lat, lng);
           if (geo.village) update("village", geo.village);
+          const summary = [geo.village, geo.district].filter(Boolean).join(", ");
           setFormLocationNote(
-            geo.village
-              ? `Tractor location detected: ${geo.village}${geo.district ? `, ${geo.district}` : ""}.`
-              : `Tractor coordinates: ${lat}, ${lng}`,
+            summary
+              ? t("app.tractorLocationFound", { summary })
+              : t("app.tractorCoordinates", { coords: `${lat}, ${lng}` }),
           );
-          push("Tractor location detected from your device.", "success");
+          push(t("app.tractorLocationDetected"), "success");
         } catch {
-          setFormLocationNote(`Tractor coordinates: ${lat}, ${lng}`);
-          push("Tractor location detected from your device.", "success");
+          setFormLocationNote(
+            t("app.tractorCoordinates", { coords: `${lat}, ${lng}` }),
+          );
+          push(t("app.tractorLocationDetected"), "success");
         } finally {
           setLocating(false);
         }
@@ -224,10 +222,10 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
         setLocating(false);
         setFormLocationError(
           positionError.code === positionError.PERMISSION_DENIED
-            ? "Location permission is blocked. Allow location for this site in your browser settings, or type your village instead."
+            ? t("app.locationPermissionBlocked")
             : positionError.code === positionError.TIMEOUT
-              ? "Location took too long. Try again near a window or outdoors, or type your village instead."
-              : "Could not read your location. Try again, or type your village instead.",
+              ? t("app.locationTimeout")
+              : t("app.locationUnavailable"),
         );
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
@@ -249,16 +247,16 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
       const response = await fetch("/api/upload", { method: "POST", body });
       const result = (await response.json()) as { error?: string; url?: string };
       if (!response.ok || !result.url) {
-        throw new Error(result.error ?? "Could not upload this photo.");
+        throw new Error(result.error ?? t("app.couldNotUploadPhoto"));
       }
       setForm((current) => ({
         ...current,
         image: result.url as string,
         images: [result.url as string, ...current.images.filter((item) => item !== result.url)],
       }));
-      push("Photo uploaded.", "success");
+      push(t("app.photoUploaded"), "success");
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "Could not upload this photo.");
+      setError(uploadError instanceof Error ? uploadError.message : t("app.couldNotUploadPhoto"));
     } finally {
       setUploading(false);
     }
@@ -267,15 +265,15 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
   async function save() {
     setError(null);
     if (!form.brand.trim() || !form.model.trim()) {
-      setError("Please add the tractor brand and model.");
+      setError(t("app.addBrandModel"));
       return;
     }
     if (!form.equipmentIds.length) {
-      setError("Please select at least one equipment.");
+      setError(t("app.selectEquipment"));
       return;
     }
     if (!form.village.trim()) {
-      setError("Choose or type the village where the tractor is based.");
+      setError(t("app.chooseTractorVillage"));
       return;
     }
     setSaving(true);
@@ -313,12 +311,15 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
         },
       );
       const result = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Could not save this tractor.");
+      if (!response.ok) throw new Error(result.error ?? t("app.couldNotSaveTractor"));
       await mutate();
-      push(editing ? "Tractor listing updated." : "Tractor listed for local work.", "success");
+      push(
+        editing ? t("app.tractorUpdated") : t("app.tractorListed"),
+        "success",
+      );
       setFormOpen(false);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Could not save this tractor.");
+      setError(saveError instanceof Error ? saveError.message : t("app.couldNotSaveTractor"));
     } finally {
       setSaving(false);
     }
@@ -330,12 +331,17 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
     try {
       const response = await fetch(`/api/tractors/${deleteTarget.id}`, { method: "DELETE" });
       const result = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Could not remove this tractor.");
+      if (!response.ok) throw new Error(result.error ?? t("app.couldNotRemoveTractor"));
       await mutate();
-      push("Tractor removed.", "success");
+      push(t("app.tractorRemoved"), "success");
       setDeleteTarget(null);
     } catch (deleteError) {
-      push(deleteError instanceof Error ? deleteError.message : "Could not remove this tractor.", "error");
+      push(
+        deleteError instanceof Error
+          ? deleteError.message
+          : t("app.couldNotRemoveTractor"),
+        "error",
+      );
     } finally {
       setDeleting(false);
     }
@@ -348,7 +354,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
           <div className="flex items-center gap-2">
             <Badge tone="green" dot>{t("app.ownerTag")}</Badge>
             <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone/70">
-              {user.ownerProfile?.village ?? "Niphad"} · Nashik
+              {user.ownerProfile?.village ?? "Niphad"}
+              {user.ownerProfile?.district ? ` · ${user.ownerProfile.district}` : ""}
             </span>
           </div>
           <h1 className="mt-2 font-display text-3xl text-forest sm:text-[2.4rem]">
@@ -365,9 +372,7 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
         <span className="flex items-start gap-2">
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
           <span>
-            Your online/offline switch is in the sidebar. Going offline pauses new requests, but
-            accepted and active work continues. Tractor status here controls whether the listing is
-            available to farmers.
+            {t("app.ownerToggleHint")}
           </span>
         </span>
       </Alert>
@@ -404,7 +409,9 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
                     {statusLabel(tractor.status)}
                   </Badge>
                   <Badge tone={tractor.ownerProfile.online ? "green" : "stone"} dot>
-                    {tractor.ownerProfile.online ? "Owner online" : "Owner offline"}
+                    {tractor.ownerProfile.online
+                      ? t("app.ownerOnlineLabel")
+                      : t("app.ownerOfflineLabel")}
                   </Badge>
                 </div>
               </div>
@@ -420,26 +427,33 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
                     </p>
                   </div>
                   <span className="shrink-0 rounded-full bg-wheat/25 px-2 py-1 text-[0.62rem] font-semibold text-[#7a5a1d]">
-                    {tractor.distanceKm} km from you
+                    {t("common.kmAway", { distance: tractor.distanceKm })}
                   </span>
                 </div>
 
                 <p className="flex items-center gap-1 text-[0.68rem] text-stone">
                   <MapPin className="size-3" /> {tractor.village}, {tractor.district} ·{" "}
-                  {tractor.serviceRadiusKm} km service radius
+                  {t("app.serviceRadiusSuffix", { distance: tractor.serviceRadiusKm })}
                 </p>
 
                 <div className="flex flex-wrap gap-1.5">
                   {tractor.pricing.hourlyEnabled ? (
                     <Badge tone="stone">
-                      {formatRupees(tractor.pricing.hourlyRate)}/hour
+                      {formatRupees(tractor.pricing.hourlyRate)}
+                      {t("common.perHour")}
                     </Badge>
                   ) : null}
                   {tractor.pricing.acreEnabled ? (
-                    <Badge tone="stone">{formatRupees(tractor.pricing.acreRate)}/acre</Badge>
+                    <Badge tone="stone">
+                      {formatRupees(tractor.pricing.acreRate)}
+                      {t("common.perAcre")}
+                    </Badge>
                   ) : null}
                   {tractor.pricing.tripEnabled ? (
-                    <Badge tone="stone">{formatRupees(tractor.pricing.tripRate)}/trip</Badge>
+                    <Badge tone="stone">
+                      {formatRupees(tractor.pricing.tripRate)}
+                      {t("common.perTrip")}
+                    </Badge>
                   ) : null}
                 </div>
 
@@ -468,12 +482,12 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
                       onClick={() => setDeleteTarget(tractor)}
                       className={buttonStyles("danger", "sm")}
                     >
-                      <Trash2 className="size-3.5" /> Remove
+                      <Trash2 className="size-3.5" /> {t("common.remove")}
                     </button>
                   </div>
                   <span className="inline-flex items-center gap-1 text-[0.62rem] text-stone">
                     <Power className="size-3" />
-                    {tractor.status === "active" ? "Visible" : "Hidden"}
+                    {tractor.status === "active" ? t("app.visible") : t("app.hidden")}
                   </span>
                 </div>
               </div>
@@ -505,14 +519,14 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-cream/40 p-3">
             <Photo
               src={form.image}
-              alt="Tractor photo"
+              alt={t("app.tractorPhotoAlt")}
               className="h-20 w-28 shrink-0 rounded-xl border border-line"
               sizes="120px"
             />
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-forest">{t("app.photo")}</p>
               <p className="mt-0.5 text-[0.62rem] text-stone">
-                Camera or gallery photo · up to 10 MB. One clear photo helps farmers recognise the tractor.
+                {t("app.photoHint")}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <input
@@ -545,7 +559,7 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
                   className={buttonStyles("outline", "sm")}
                 >
                   <Camera className="size-3.5 text-forest" />
-                  Take Photo
+                  {t("app.takePhoto")}
                 </button>
                 <button
                   type="button"
@@ -558,7 +572,7 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
                   ) : (
                     <ImagePlus className="size-3.5 text-forest" />
                   )}
-                  {uploading ? "Uploading…" : t("app.uploadPhoto")}
+                  {uploading ? t("common.uploading") : t("app.uploadPhoto")}
                 </button>
               </div>
             </div>
@@ -611,12 +625,12 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
               <Field
                 label={t("app.village")}
                 required
-                hint="Type the village name. We fill the map location when it matches a known village, or use your current location."
+                hint={t("app.tractorVillageHint")}
               >
                 <Input
                   value={form.village}
                   onChange={(event) => changeVillageSelection(event.target.value)}
-                  placeholder="Type your village name"
+                  placeholder={t("app.villagePlaceholder")}
                   autoComplete="address-level2"
                 />
               </Field>
@@ -633,11 +647,10 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
                 <div className="flex flex-wrap items-center justify-between gap-2.5">
                   <div className="min-w-0">
                     <p className="flex items-center gap-1.5 text-xs font-semibold text-forest">
-                      <MapPin className="size-3.5" /> Tractor location
+                      <MapPin className="size-3.5" /> {t("app.tractorLocation")}
                     </p>
                     <p className="mt-0.5 text-[0.65rem] leading-relaxed text-stone">
-                      Use this device’s GPS for the tractor’s map position, or type a village that
-                      is not in the list. Farmers only see your tractor within your service radius.
+                      {t("app.tractorLocationHint")}
                     </p>
                   </div>
                   <Button
@@ -647,7 +660,7 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
                     onClick={useFormLocation}
                     loading={locating}
                   >
-                    <LocateFixed className="size-3.5" /> Use my current location
+                    <LocateFixed className="size-3.5" /> {t("app.useCurrentLocation")}
                   </Button>
                 </div>
                 <p className="mt-2 text-[0.6rem] text-stone">
@@ -677,7 +690,7 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
                 >
                   <option value="active">{t("app.availableForBookings")}</option>
                   <option value="maintenance">{t("app.underMaintenance")}</option>
-                  <option value="inactive">Hide from farmers</option>
+                  <option value="inactive">{t("app.hideFromFarmers")}</option>
                 </Select>
               </Field>
             </div>
@@ -811,8 +824,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
       <Modal
         open={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
-        title="Remove this tractor?"
-        description="Farmers will no longer see this tractor. Bookings already accepted or in progress must be completed or cancelled first."
+        title={t("app.removeTractorTitle")}
+        description={t("app.removeTractorBody")}
         size="sm"
         footer={
           <>
@@ -820,7 +833,7 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
               {t("common.cancel")}
             </Button>
             <Button variant="danger" loading={deleting} onClick={remove}>
-              <Trash2 className="size-4" /> Remove tractor
+              <Trash2 className="size-4" /> {t("app.removeTractor")}
             </Button>
           </>
         }

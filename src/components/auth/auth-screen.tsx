@@ -62,19 +62,26 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
       const response = await fetch("/api/auth/request-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile, role, language }),
+        body: JSON.stringify({ mobile, name, role, language }),
       });
       const data = (await response.json()) as {
         error?: string;
+        code?: string;
         signedIn?: boolean;
         devOtp?: string;
         isExisting?: boolean;
         name?: string | null;
         role?: Role | null;
       };
-      if (!response.ok) throw new Error(data.error ?? "Could not send the OTP.");
+      if (!response.ok) {
+        throw new Error(
+          data.code === "identity_mismatch"
+            ? t("auth.mismatch")
+            : data.error ?? t("auth.couldNotSendOtp"),
+        );
+      }
       if (data.signedIn) {
-        push("Welcome back. Signing you in…", "success");
+        push(t("auth.welcomeBack"), "success");
         router.push("/dashboard");
         router.refresh();
         return;
@@ -86,9 +93,9 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
       setStep("otp");
       setSeconds(60);
       setOtp("");
-      push(`Sign-in OTP sent to your mobile ending ${mobileEnding(mobile)}.`, "info");
+      push(t("auth.otpSentToast", { ending: mobileEnding(mobile) }), "info");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Could not send the OTP.");
+      setError(requestError instanceof Error ? requestError.message : t("auth.couldNotSendOtp"));
     } finally {
       setLoading(false);
     }
@@ -104,12 +111,18 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mobile, otp, name, role, language }),
       });
-      const data = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(data.error ?? "Could not verify this OTP.");
+      const data = (await response.json()) as { error?: string; code?: string };
+      if (!response.ok) {
+        throw new Error(
+          data.code === "identity_mismatch"
+            ? t("auth.mismatch")
+            : data.error ?? t("auth.couldNotVerifyOtp"),
+        );
+      }
       router.push("/dashboard");
       router.refresh();
     } catch (verifyError) {
-      setError(verifyError instanceof Error ? verifyError.message : "Could not verify this OTP.");
+      setError(verifyError instanceof Error ? verifyError.message : t("auth.couldNotVerifyOtp"));
       setLoading(false);
     }
   }
@@ -221,7 +234,7 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
                     id="name"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    placeholder="Your full name"
+                    placeholder={t("auth.namePlaceholder")}
                     autoComplete="name"
                   />
                 </Field>
@@ -254,6 +267,8 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
                   onClick={() => {
                     setStep("mobile");
                     setError(null);
+                    setIsExisting(false);
+                    setExistingName(null);
                   }}
                   className="text-xs font-semibold text-clay hover:underline"
                 >
@@ -267,7 +282,7 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
                     id="name-otp"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    placeholder="Your full name"
+                    placeholder={t("auth.namePlaceholder")}
                     autoComplete="name"
                   />
                 </Field>
@@ -308,9 +323,13 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
               <div className="flex items-center justify-between text-xs text-stone">
                 <span>
                   {seconds > 0 ? (
-                    <>Resend in 00:{String(seconds).padStart(2, "0")}</>
+                    <>
+                      {t("auth.resendIn", {
+                        seconds: String(seconds).padStart(2, "0"),
+                      })}
+                    </>
                   ) : (
-                    "Didn’t receive the OTP?"
+                    t("auth.noOtp")
                   )}
                 </span>
                 <button
@@ -334,7 +353,7 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 border-t border-line/70 py-4 text-[0.62rem] text-stone">
           <span>© 2026 KisanTractor</span>
           <span className="inline-flex items-center gap-1.5">
-            <ShieldCheck className="size-3" /> Direct payments only
+            <ShieldCheck className="size-3" /> {t("auth.directPaymentsOnly")}
           </span>
         </div>
       </div>
@@ -342,7 +361,7 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
       <div className="relative hidden overflow-hidden bg-forest lg:block">
         <Photo
           src={PHOTOS.heroTractor}
-          alt="Tractor working in a field"
+          alt={t("auth.heroAlt")}
           className="absolute inset-0 h-full w-full"
           sizes="50vw"
           priority
@@ -351,27 +370,29 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
         <div className="relative flex h-full flex-col justify-between p-10">
           <div className="flex justify-end">
             <Badge tone="green" className="!border-cream/20 !bg-cream/10 !text-cream">
-              Rooted in local trust
+              {t("auth.rootedTrust")}
             </Badge>
           </div>
           <div>
             <p className="max-w-md font-display text-4xl leading-[1.05] text-cream">
-              “The farmer pays me directly. No middleman, no waiting for a payout.”
+              {t("auth.testimonial")}
             </p>
             <div className="mt-6 flex items-center gap-3">
               <span className="flex size-11 items-center justify-center rounded-full bg-wheat font-display text-sm font-semibold text-forest">
                 <Tractor className="size-5" />
               </span>
               <div>
-                <p className="text-sm font-semibold text-cream">A local tractor owner</p>
-                <p className="text-xs text-cream/55">Niphad, Nashik</p>
+                <p className="text-sm font-semibold text-cream">
+                  {t("auth.testimonialBy")}
+                </p>
+                <p className="text-xs text-cream/55">{t("auth.testimonialPlace")}</p>
               </div>
             </div>
             <div className="mt-8 grid grid-cols-3 gap-3">
               {[
-                { value: "₹0", label: "Commission" },
-                { value: "Direct", label: "Farmer → owner" },
-                { value: "22", label: "Languages" },
+                { value: "₹0", label: t("auth.statCommission") },
+                { value: t("auth.statDirect"), label: t("landing.payment.direct") },
+                { value: "22", label: t("auth.statLanguages") },
               ].map((stat) => (
                 <div key={stat.label} className="rounded-2xl border border-cream/12 bg-cream/5 px-3 py-3 backdrop-blur">
                   <p className="font-display text-xl text-cream">{stat.value}</p>

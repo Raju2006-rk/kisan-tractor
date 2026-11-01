@@ -112,15 +112,11 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
     setLocationError(null);
     setLocationNote(null);
     if (typeof window !== "undefined" && !window.isSecureContext) {
-      setLocationError(
-        "Location detection needs a secure https connection. Open this site over https, or type your village manually.",
-      );
+      setLocationError(t("app.locationNeedsHttps"));
       return;
     }
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setLocationError(
-        "This browser cannot detect location. Type your village name manually.",
-      );
+      setLocationError(t("app.locationBrowserUnsupported"));
       return;
     }
     setLocating(true);
@@ -138,14 +134,23 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
           if (geo.district) setDistrict(geo.district);
           if (geo.state) setStateName(geo.state);
 
-          const summary = [geo.village, geo.district, geo.state].filter(Boolean).join(", ");
+          const summary = [geo.village, geo.district, geo.state]
+            .filter(Boolean)
+            .join(", ");
           setLocationNote(
-            `Found: ${summary || `${lat}, ${lng}`}${geo.pincode ? ` (Pincode: ${geo.pincode})` : ""}. Tap Save to update profile.`,
+            t("app.locationFound", {
+              summary: summary || `${lat}, ${lng}`,
+              pincode: geo.pincode
+                ? ` (${t("app.pincode")}: ${geo.pincode})`
+                : "",
+            }),
           );
-          push("Location detected from your device.", "success");
+          push(t("app.locationDetected"), "success");
         } catch {
-          setLocationNote(`Coordinates captured: ${lat}, ${lng}. Tap Save to update profile.`);
-          push("Coordinates captured from your device.", "info");
+          setLocationNote(
+            t("app.locationCaptured", { coords: `${lat}, ${lng}` }),
+          );
+          push(t("app.coordinatesCaptured"), "info");
         } finally {
           setLocating(false);
         }
@@ -154,10 +159,10 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
         setLocating(false);
         setLocationError(
           positionError.code === positionError.PERMISSION_DENIED
-            ? "Location permission is blocked. Allow location for this site in your browser settings, or type your village manually."
+            ? t("app.locationPermissionBlocked")
             : positionError.code === positionError.TIMEOUT
-              ? "Location took too long. Try again near a window or outdoors, or type your village manually."
-              : "Could not read your location. Try again, or type your village manually.",
+              ? t("app.locationTimeout")
+              : t("app.locationUnavailable"),
         );
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
@@ -181,12 +186,12 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
     setSaved(false);
     if (!village.trim()) {
       setSaving(false);
-      setError("Enter your village name.");
+      setError(t("app.enterVillage"));
       return;
     }
     if (isOwner && rcNumber.trim() && !rcNumberValid) {
       setSaving(false);
-      setError("Enter a valid RC number, for example MH 15 AB 1234, or upload the RC photo.");
+      setError(t("app.invalidRc"));
       return;
     }
     try {
@@ -215,12 +220,12 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
         }),
       });
       const result = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Could not save your profile.");
+      if (!response.ok) throw new Error(result.error ?? t("app.couldNotSaveProfile"));
       setSaved(true);
-      push("Profile updated.", "success");
+      push(t("app.profileUpdated"), "success");
       router.refresh();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Could not save your profile.");
+      setError(saveError instanceof Error ? saveError.message : t("app.couldNotSaveProfile"));
     } finally {
       setSaving(false);
     }
@@ -228,7 +233,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
 
   function changeLanguage(next: Language) {
     setLanguage(next);
-    push("Language preference updated.", "success");
+    push(t("app.languageUpdated"), "success");
   }
 
   async function uploadDocument(kind: "dl" | "rc", file: File) {
@@ -240,15 +245,18 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
       const response = await fetch("/api/upload", { method: "POST", body });
       const result = (await response.json()) as { url?: string; error?: string };
       if (!response.ok || !result.url) {
-        throw new Error(result.error ?? "Could not upload this document.");
+        throw new Error(result.error ?? t("app.uploadFailed"));
       }
       if (kind === "dl") setDlPhoto(result.url);
       else setRcPhoto(result.url);
       setSaved(false);
-      push(kind === "dl" ? "Driving licence uploaded." : "RC photo uploaded.", "success");
+      push(
+        kind === "dl" ? t("app.dlUploaded") : t("app.rcUploaded"),
+        "success",
+      );
     } catch (uploadError) {
       setError(
-        uploadError instanceof Error ? uploadError.message : "Could not upload this document.",
+        uploadError instanceof Error ? uploadError.message : t("app.uploadFailed"),
       );
     } finally {
       setUploadingDoc(null);
@@ -272,7 +280,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
         <div className="flex items-center gap-2">
           <Badge tone="green" dot>{roleLabel(user.role)}</Badge>
           <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone/70">
-            {village ? `${village}${district ? ` · ${district}` : ""}` : "Location not set"}
+            {village ? `${village}${district ? ` · ${district}` : ""}` : t("common.locationNotSet")}
           </span>
         </div>
         <h1 className="mt-2 font-display text-3xl text-forest sm:text-[2.4rem]">
@@ -289,11 +297,11 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
               <div className="min-w-0 flex-1">
                 <h2 className="font-display text-2xl text-forest">{user.name}</h2>
                 <p className="mt-0.5 text-xs text-stone">
-                  {isOwner ? "Tractor owner" : "Farmer"} · {maskMobile(user.mobile)}
+                  {roleLabel(user.role)} · {maskMobile(user.mobile)}
                 </p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   <Badge tone="green">
-                    <BadgeCheck className="size-3" /> Verified mobile
+                    <BadgeCheck className="size-3" /> {t("app.verifiedMobile")}
                   </Badge>
                   <Badge tone="stone">
                     <CalendarDays className="size-3" /> {t("app.memberSince")}{" "}
@@ -308,41 +316,40 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
               {saved ? (
                 <Alert tone="success">
                   <span className="inline-flex items-center gap-1.5">
-                    <Check className="size-3.5" /> Profile saved. Your dashboard now uses these
-                    details.
+                    <Check className="size-3.5" /> {t("app.profileSaved")}
                   </span>
                 </Alert>
               ) : null}
 
               <div>
-                <h3 className="text-sm font-semibold text-forest">Personal details</h3>
+                <h3 className="text-sm font-semibold text-forest">{t("app.personalDetails")}</h3>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                  <Field label="Full name" required>
+                  <Field label={t("app.fullName")} required>
                     <Input
                       value={name}
                       onChange={(event) => setName(event.target.value)}
                       autoComplete="name"
                     />
                   </Field>
-                  <Field label="Mobile number" hint="Used for OTP login">
+                  <Field label={t("common.mobile")} hint={t("app.mobileUsedForOtp")}>
                     <Input value={`+91 ${user.mobile}`} readOnly disabled />
                   </Field>
                   <Field label={t("app.role")}>
-                    <Input value={isOwner ? "Tractor owner" : "Farmer"} readOnly disabled />
+                    <Input value={roleLabel(user.role)} readOnly disabled />
                   </Field>
                   <Field
                     label={t("app.village")}
                     required
-                    hint="Village, town or locality name."
+                    hint={t("app.villageHint")}
                   >
                     <Input
                       value={village}
                       onChange={(event) => setVillage(event.target.value)}
-                      placeholder="Type your village name"
+                      placeholder={t("app.villagePlaceholder")}
                       autoComplete="address-level2"
                     />
                   </Field>
-                  <Field label="Pincode" hint="6-digit postal code">
+                  <Field label={t("app.pincode")} hint={t("app.pincodeHint")}>
                     <Input
                       value={pincode}
                       onChange={(event) => setPincode(event.target.value)}
@@ -355,17 +362,17 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                     <Input
                       value={address}
                       onChange={(event) => setAddress(event.target.value)}
-                      placeholder="House / farm address, landmark, road"
+                      placeholder={t("app.addressPlaceholder")}
                     />
                   </Field>
                   <div className="rounded-2xl border border-line/80 bg-cream/30 p-3.5 sm:col-span-2">
                     <div className="flex flex-wrap items-center justify-between gap-2.5">
                       <div className="min-w-0">
                         <p className="flex items-center gap-1.5 text-xs font-semibold text-forest">
-                          <MapPin className="size-3.5" /> Auto-detect my location
+                          <MapPin className="size-3.5" /> {t("app.autoDetect")}
                         </p>
                         <p className="mt-0.5 text-[0.65rem] leading-relaxed text-stone">
-                          Use GPS to auto-fill your exact village, address, pincode, and coordinates.
+                          {t("app.autoDetectBody")}
                         </p>
                       </div>
                       <Button
@@ -375,7 +382,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                         onClick={useMyLocation}
                         loading={locating}
                       >
-                        <LocateFixed className="size-3.5" /> Use my current location
+                        <LocateFixed className="size-3.5" /> {t("app.useCurrentLocation")}
                       </Button>
                     </div>
                     {locationError ? (
@@ -397,7 +404,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                     <p className="mt-2 text-[0.6rem] text-stone">
                       {coords.lat && coords.lng
                         ? `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}${district || stateName ? ` · ${[district, stateName].filter(Boolean).join(", ")}` : ""}${pincode ? ` (${pincode})` : ""}`
-                        : "No coordinates saved yet. Tap 'Use my current location' to auto-detect."}
+                        : t("app.noCoordinates")}
                     </p>
                   </div>
                   {isOwner ? (
@@ -420,12 +427,11 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                     <Globe2 className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-forest">Language</p>
+                    <p className="text-sm font-semibold text-forest">{t("app.languageTitle")}</p>
                     <p className="mt-0.5 text-[0.65rem] leading-relaxed text-stone">
-                      Available in English and all 22 scheduled Indian languages. Your choice is
-                      saved to your account.
+                      {t("app.languageBody")}
                     </p>
-                    <Field label="App language" className="mt-2.5">
+                    <Field label={t("app.appLanguage")} className="mt-2.5">
                       <Select
                         value={language}
                         onChange={(event) => changeLanguage(event.target.value as Language)}
@@ -455,16 +461,15 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                         <FileCheck className="size-4" />
                       </span>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-forest">Documents & verification</p>
+                        <p className="text-sm font-semibold text-forest">{t("app.documentsTitle")}</p>
                         <p className="mt-0.5 text-[0.65rem] leading-relaxed text-stone">
-                          Add your driving licence if you have one, and your vehicle RC number or RC
-                          photo. Documents are optional and can be added later.
+                          {t("app.documentsBody")}
                         </p>
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <Badge tone={documentsVerified ? "green" : "stone"} dot>
-                        {documentsVerified ? "Verified" : "Not added"}
+                        {documentsVerified ? t("app.verified") : t("app.notAdded")}
                       </Badge>
                       <ChevronDown
                         className={cn(
@@ -481,23 +486,23 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                         <div className="rounded-xl border border-line bg-paper p-3">
                           <div className="flex items-center justify-between gap-2">
                             <p className="flex items-center gap-1.5 text-xs font-semibold text-forest">
-                              <IdCard className="size-3.5" /> Driving licence
+                              <IdCard className="size-3.5" /> {t("app.drivingLicence")}
                             </p>
                             <Badge tone={dlVerified ? "green" : "stone"}>
-                              {dlVerified ? "Verified" : "Optional"}
+                              {dlVerified ? t("app.verified") : t("common.optional")}
                             </Badge>
                           </div>
                           {dlPhoto ? (
                             <Photo
                               src={dlPhoto}
-                              alt="Driving licence"
+                              alt={t("app.drivingLicenceAlt")}
                               className="mt-2 h-28 w-full rounded-lg border border-line"
                               sizes="(max-width: 640px) 100vw, 320px"
                             />
                           ) : (
                             <div className="mt-2 flex h-28 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line bg-cream/40 text-stone">
                               <IdCard className="size-6 text-forest/40" />
-                              <p className="text-[0.62rem]">No DL added</p>
+                              <p className="text-[0.62rem]">{t("app.noDl")}</p>
                             </div>
                           )}
                           <input
@@ -519,7 +524,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                               disabled={uploadingDoc !== null}
                               onClick={() => dlInputRef.current?.click()}
                             >
-                              <Upload className="size-3.5" /> {dlPhoto ? "Replace DL" : "Upload DL"}
+                              <Upload className="size-3.5" /> {dlPhoto ? t("app.replaceDl") : t("app.uploadDl")}
                             </Button>
                             {dlPhoto ? (
                               <Button
@@ -529,28 +534,28 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                                 disabled={uploadingDoc !== null}
                                 onClick={() => removeDocument("dl")}
                               >
-                                <Trash className="size-3.5" /> Remove
+                                <Trash className="size-3.5" /> {t("common.remove")}
                               </Button>
                             ) : null}
                       </div>
                       <p className="mt-1.5 text-[0.6rem] leading-relaxed text-stone">
-                        If you do not have a driving licence, leave this empty. It is not required.
+                        {t("app.dlNotRequired")}
                       </p>
                     </div>
 
                     <div className="rounded-xl border border-line bg-paper p-3">
                       <div className="flex items-center justify-between gap-2">
                         <p className="flex items-center gap-1.5 text-xs font-semibold text-forest">
-                          <FileCheck className="size-3.5" /> Vehicle RC
+                          <FileCheck className="size-3.5" /> {t("app.vehicleRc")}
                         </p>
                         <Badge tone={rcVerified ? "green" : "stone"}>
-                          {rcVerified ? "Verified" : "Not added"}
+                          {rcVerified ? t("app.verified") : t("app.notAdded")}
                         </Badge>
                       </div>
                       <Field
-                        label="RC number"
+                        label={t("app.rcNumber")}
                         className="mt-2"
-                        hint="Type the number printed on the RC paper."
+                        hint={t("app.rcHint")}
                       >
                         <Input
                           value={rcNumber}
@@ -565,14 +570,14 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                       {rcPhoto ? (
                         <Photo
                           src={rcPhoto}
-                          alt="Vehicle RC paper"
+                          alt={t("app.vehicleRcAlt")}
                           className="mt-2 h-28 w-full rounded-lg border border-line"
                           sizes="(max-width: 640px) 100vw, 320px"
                         />
                       ) : (
                         <div className="mt-2 flex h-28 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line bg-cream/40 text-stone">
                           <ImagePlus className="size-6 text-forest/40" />
-                          <p className="text-[0.62rem]">No RC photo added</p>
+                          <p className="text-[0.62rem]">{t("app.noRcPhoto")}</p>
                         </div>
                       )}
                       <input
@@ -594,7 +599,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                           disabled={uploadingDoc !== null}
                           onClick={() => rcInputRef.current?.click()}
                         >
-                          <Upload className="size-3.5" /> {rcPhoto ? "Replace RC photo" : "Upload RC photo"}
+                          <Upload className="size-3.5" /> {rcPhoto ? t("app.replaceRcPhoto") : t("app.uploadRcPhoto")}
                         </Button>
                         {rcPhoto ? (
                           <Button
@@ -604,29 +609,27 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                             disabled={uploadingDoc !== null}
                             onClick={() => removeDocument("rc")}
                           >
-                            <Trash className="size-3.5" /> Remove
+                            <Trash className="size-3.5" /> {t("common.remove")}
                           </Button>
                         ) : null}
                       </div>
                       <p className="mt-1.5 text-[0.6rem] leading-relaxed text-stone">
-                        Enter the RC number manually, upload a photo, or do both.
+                        {t("app.rcEntryHint")}
                       </p>
                     </div>
                       </div>
 
                       <p className="mt-2.5 flex items-start gap-1.5 text-[0.62rem] leading-relaxed text-stone">
                         <ShieldCheck className="mt-0.5 size-3 shrink-0 text-forest" />
-                        Verified means the file was uploaded successfully and, for the RC, the number
-                        matches the Indian registration format. KisanTractor never asks for a bank OTP,
-                        UPI PIN or password.
+                        {t("app.verifiedExplanation")}
                       </p>
 
                       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-3">
                         <p className="text-[0.62rem] leading-relaxed text-stone">
-                          Your documents are saved with your profile.
+                          {t("app.documentsSaved")}
                         </p>
                         <Button type="button" size="sm" onClick={save} loading={saving}>
-                          <Check className="size-3.5" /> Save changes
+                          <Check className="size-3.5" /> {t("common.save")}
                         </Button>
                       </div>
                     </div>
@@ -636,7 +639,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/80 pt-4">
                 <p className="text-[0.65rem] leading-relaxed text-stone">
-                  Your mobile number is used only for login and booking coordination.
+                  {t("app.mobileUsedOnly")}
                 </p>
                 <Button onClick={save} loading={saving}>
                   <Check className="size-4" /> {t("common.save")}
@@ -646,24 +649,23 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
           </Card>
 
           <Card className="p-4 sm:p-5">
-            <h2 className="font-display text-xl text-forest">Trust & safety</h2>
+            <h2 className="font-display text-xl text-forest">{t("app.trustSafety")}</h2>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <div className="flex items-start gap-2.5 rounded-xl bg-cream/50 px-3.5 py-3">
                 <ShieldCheck className="mt-0.5 size-4 shrink-0 text-forest" />
                 <div>
-                  <p className="text-xs font-semibold text-forest">Never share secrets</p>
+                  <p className="text-xs font-semibold text-forest">{t("app.neverShareSecrets")}</p>
                   <p className="mt-0.5 text-[0.65rem] leading-relaxed text-stone">
-                    KisanTractor never asks for your bank OTP, UPI PIN, card PIN or password.
+                    {t("app.neverShareSecretsBody")}
                   </p>
                 </div>
               </div>
               <div className="flex items-start gap-2.5 rounded-xl bg-cream/50 px-3.5 py-3">
                 <Wallet className="mt-0.5 size-4 shrink-0 text-forest" />
                 <div>
-                  <p className="text-xs font-semibold text-forest">Direct payments only</p>
+                  <p className="text-xs font-semibold text-forest">{t("app.directPaymentsOnly")}</p>
                   <p className="mt-0.5 text-[0.65rem] leading-relaxed text-stone">
-                    You pay the tractor owner directly. The platform holds no money and takes no
-                    commission.
+                    {t("app.directPaymentsBody")}
                   </p>
                 </div>
               </div>
@@ -674,21 +676,21 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
         <aside className="space-y-3">
           <Card className="p-4">
             <p className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-stone">
-              Account
+              {t("app.account")}
             </p>
             <div className="mt-2 space-y-1.5 text-[0.68rem] text-stone">
               <p className="flex items-center justify-between gap-2">
-                <span>Account type</span>
+                <span>{t("app.accountType")}</span>
                 <span className="font-semibold text-forest">{roleLabel(user.role)}</span>
               </p>
               <p className="flex items-center justify-between gap-2">
-                <span>Member since</span>
+                <span>{t("app.memberSince")}</span>
                 <span className="font-semibold text-forest">
                   {formatDate(user.createdAt.slice(0, 10))}
                 </span>
               </p>
               <p className="flex items-center justify-between gap-2">
-                <span>Village</span>
+                <span>{t("app.village")}</span>
                 <span className="font-semibold text-forest">{currentVillage}</span>
               </p>
             </div>
@@ -708,7 +710,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                     <span className="block text-xs font-semibold text-forest">
                       {t("nav.myTractor")}
                     </span>
-                    <span className="block text-[0.62rem] text-stone">Listing, rates & equipment</span>
+                    <span className="block text-[0.62rem] text-stone">{t("app.listingRatesEquipment")}</span>
                   </span>
                 </span>
                 <ArrowRight className="size-3.5 text-stone" />
@@ -725,7 +727,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                     <span className="block text-xs font-semibold text-forest">
                       {t("nav.payments")}
                     </span>
-                    <span className="block text-[0.62rem] text-stone">UPI, QR and bank details</span>
+                    <span className="block text-[0.62rem] text-stone">{t("app.upiQrBank")}</span>
                   </span>
                 </span>
                 <ArrowRight className="size-3.5 text-stone" />
@@ -741,8 +743,8 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                   <Sprout className="size-4" />
                 </span>
                 <span>
-                  <span className="block text-xs font-semibold text-forest">Find a tractor</span>
-                  <span className="block text-[0.62rem] text-stone">Local owners near your farm</span>
+                  <span className="block text-xs font-semibold text-forest">{t("nav.findTractor")}</span>
+                  <span className="block text-[0.62rem] text-stone">{t("app.localOwnersNearFarm")}</span>
                 </span>
               </span>
               <ArrowRight className="size-3.5 text-stone" />
@@ -751,16 +753,15 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
 
           <div className="rounded-2xl border border-line/70 bg-paper/60 p-4">
             <p className="flex items-center gap-1.5 text-[0.62rem] font-bold uppercase tracking-[0.14em] text-stone">
-              <MapPin className="size-3.5" /> Location
+              <MapPin className="size-3.5" /> {t("app.locationTitle")}
             </p>
             <p className="mt-1.5 text-[0.66rem] leading-relaxed text-stone">
-              Your village is used to show nearby tractors and estimate distance. You can still
-              choose a different farm location for each booking.
+              {t("app.locationBody")}
             </p>
             <p className="mt-2 text-[0.62rem] font-semibold text-forest">
               {coords.lat && coords.lng
                 ? `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}${district || stateName ? ` · ${[district, stateName].filter(Boolean).join(", ")}` : ""}${pincode ? ` (${pincode})` : ""}`
-                : "No location coordinates set yet."}
+                : t("app.noCoordinatesSet")}
             </p>
           </div>
 
@@ -768,8 +769,8 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
             <UserRound className="size-4 shrink-0" />
             <span>
               {isOwner
-                ? "Keep your service radius realistic so farmers nearby can find you."
-                : "Your contact details are shared with the owner only after they accept a booking."}
+                ? t("app.serviceRadiusTip")
+                : t("app.contactSharedAfterAccept")}
             </span>
           </div>
 
@@ -780,7 +781,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
             className="flex w-full items-center justify-center gap-2 rounded-2xl border border-clay/25 bg-clay/8 px-3.5 py-3 text-xs font-semibold text-clay-dark transition hover:border-clay/40 hover:bg-clay/15 disabled:opacity-60"
           >
             <LogOut className="size-4" />
-            {loggingOut ? "Logging out…" : "Log out of this account"}
+            {loggingOut ? t("app.loggingOut") : t("app.logoutAccount")}
           </button>
         </aside>
       </div>

@@ -231,6 +231,45 @@ export type PaymentRecord = {
   notes: string;
 };
 
+/** Confirmed money received by one tractor, aggregated by the server. */
+export type TractorEarnings = {
+  tractorId: string;
+  brand: string;
+  model: string;
+  registrationNumber: string;
+  image: string;
+  total: number;
+  thisMonth: number;
+  lastMonth: number;
+  pending: number;
+  completedJobs: number;
+  lastPaidAt: string | null;
+};
+
+export type OwnerEarningRecord = {
+  paymentId: string;
+  bookingId: string;
+  amount: number;
+  paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod;
+  paidAt: string;
+  confirmedAt: string | null;
+  farmerName: string;
+  tractorId: string;
+  tractorLabel: string;
+};
+
+export type OwnerEarningsSummary = {
+  total: number;
+  thisMonth: number;
+  lastMonth: number;
+  pending: number;
+  confirmedPayments: number;
+  completedJobs: number;
+  byTractor: TractorEarnings[];
+  recent: OwnerEarningRecord[];
+};
+
 export type StatusHistory = {
   id: string;
   bookingId: string;

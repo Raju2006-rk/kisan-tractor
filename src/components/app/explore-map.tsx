@@ -1,7 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap } from "leaflet";
+import {
+  hasGoogleMapsKey,
+  loadGoogleMaps,
+  type GoogleInfoWindow,
+  type GoogleMap,
+  type GoogleMarker,
+} from "@/lib/google-maps";
 import { useI18n } from "@/lib/i18n";
 import { formatRupees } from "@/lib/pricing";
 import type { TractorWithOwner } from "@/lib/types";
@@ -26,6 +33,143 @@ function rateLabel(tractor: TractorWithOwner) {
 }
 
 export default function ExploreMap({
+  tractors,
+  center,
+}: {
+  tractors: TractorWithOwner[];
+  center: { lat: number; lng: number };
+}) {
+  const { t } = useI18n();
+  const [googleFailed, setGoogleFailed] = useState(false);
+  const useGoogle = hasGoogleMapsKey() && !googleFailed;
+
+  return (
+    <div className="relative overflow-hidden rounded-[1.5rem] border border-line bg-sand shadow-[var(--shadow-card)]">
+      {useGoogle ? (
+        <GoogleExploreMap
+          tractors={tractors}
+          center={center}
+          onError={() => setGoogleFailed(true)}
+        />
+      ) : (
+        <LeafletExploreMap tractors={tractors} center={center} />
+      )}
+      <div className="pointer-events-none absolute left-3 top-3 z-[500] flex items-center gap-1.5 rounded-full border border-forest/10 bg-paper/95 px-3 py-1.5 text-[0.65rem] font-semibold text-forest shadow-sm backdrop-blur">
+        <span className="size-1.5 rounded-full bg-forest pulse-ring" />
+        {tractors.length} {tractors.length === 1 ? t("app.tractorSingular") : t("app.tractorPlural")}{" "}
+        {t("app.onTheMap")}
+      </div>
+    </div>
+  );
+}
+
+function GoogleExploreMap({
+  tractors,
+  center,
+  onError,
+}: {
+  tractors: TractorWithOwner[];
+  center: { lat: number; lng: number };
+  onError: () => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<GoogleMap | null>(null);
+  const markersRef = useRef<GoogleMarker[]>([]);
+  const infoRef = useRef<GoogleInfoWindow | null>(null);
+  const [ready, setReady] = useState(false);
+  const { t } = useI18n();
+
+  useEffect(() => {
+    let cancelled = false;
+    loadGoogleMaps()
+      .then((google) => {
+        if (cancelled || !containerRef.current || mapRef.current) return;
+        const map = new google.maps.Map(containerRef.current, {
+          center,
+          zoom: 11,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+          clickableIcons: false,
+          gestureHandling: "cooperative",
+        });
+        mapRef.current = map;
+        infoRef.current = new google.maps.InfoWindow();
+        setReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) onError();
+      });
+
+    return () => {
+      cancelled = true;
+      markersRef.current.forEach((marker) => marker.setMap(null));
+      markersRef.current = [];
+      infoRef.current?.close();
+      infoRef.current = null;
+      mapRef.current = null;
+      setReady(false);
+    };
+    // The map shell is created once; later effects keep markers and centre fresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const google = typeof window !== "undefined" ? window.google : undefined;
+    const map = mapRef.current;
+    const info = infoRef.current;
+    if (!ready || !google || !map) return;
+
+    markersRef.current.forEach((marker) => marker.setMap(null));
+    markersRef.current = [];
+    const bounds = new google.maps.LatLngBounds();
+
+    for (const tractor of tractors) {
+      const marker = new google.maps.Marker({
+        position: { lat: tractor.lat, lng: tractor.lng },
+        map,
+        title: `${tractor.brand} ${tractor.model}`,
+      });
+      marker.addListener("click", () => {
+        info?.setContent(
+          `<div style="font-family:Manrope,sans-serif;min-width:190px;padding:2px 0;">
+            <div style="font-family:Fraunces,Georgia,serif;font-size:17px;color:#163b2a;line-height:1.15;">${escapeHtml(
+              `${tractor.brand} ${tractor.model}`,
+            )}</div>
+            <div style="margin-top:3px;font-size:11px;color:#667066;">${escapeHtml(
+              tractor.owner.name,
+            )} · ${escapeHtml(tractor.village)}</div>
+            <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <span style="font-size:11px;font-weight:700;color:#163b2a;">${escapeHtml(
+                rateLabel(tractor),
+              )}</span>
+              <span style="font-size:10px;color:#667066;">${tractor.distanceKm} km</span>
+            </div>
+            <a href="/tractors/${encodeURIComponent(
+              tractor.id,
+            )}" style="margin-top:9px;display:block;border-radius:999px;background:#163b2a;color:#f7f2e6;text-align:center;padding:7px 10px;font-size:11px;font-weight:700;text-decoration:none;">${escapeHtml(
+              t("app.viewTractor"),
+            )}</a>
+          </div>`,
+        );
+        info?.open({ map, anchor: marker });
+      });
+      markersRef.current.push(marker);
+      bounds.extend({ lat: tractor.lat, lng: tractor.lng });
+    }
+
+    if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, 46);
+    } else {
+      map.setCenter(center);
+      map.setZoom(11);
+    }
+  }, [center, ready, tractors, t]);
+
+  return <div ref={containerRef} className="h-[430px] w-full lg:h-[590px]" />;
+}
+
+function LeafletExploreMap({
   tractors,
   center,
 }: {
@@ -132,13 +276,5 @@ export default function ExploreMap({
     };
   }, [tractors, t]);
 
-  return (
-    <div className="relative overflow-hidden rounded-[1.5rem] border border-line bg-sand shadow-[var(--shadow-card)]">
-      <div ref={containerRef} className="h-[430px] w-full lg:h-[590px]" />
-      <div className="pointer-events-none absolute left-3 top-3 z-[500] flex items-center gap-1.5 rounded-full border border-forest/10 bg-paper/95 px-3 py-1.5 text-[0.65rem] font-semibold text-forest shadow-sm backdrop-blur">
-        <span className="size-1.5 rounded-full bg-forest pulse-ring" />
-        {tractors.length} {tractors.length === 1 ? "tractor" : "tractors"} on the map
-      </div>
-    </div>
-  );
+  return <div ref={containerRef} className="h-[430px] w-full lg:h-[590px]" />;
 }

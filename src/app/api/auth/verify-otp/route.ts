@@ -5,6 +5,7 @@ import {
   isValidMobile,
   normalizeMobile,
   rememberDevice,
+  validateStoredIdentity,
   verifyOtpChallenge,
   verifySupabaseOtp,
 } from "@/lib/auth";
@@ -51,6 +52,15 @@ export async function POST(request: Request) {
 
     const db = await getDb();
     const existing = db.users.find((u) => u.mobile === mobile);
+
+    const identity = await validateStoredIdentity(mobile, body.name);
+    if (!identity.ok) {
+      return NextResponse.json(
+        { error: identity.reason, code: "identity_mismatch" },
+        { status: 400 },
+      );
+    }
+
     const role: Role = existing?.role ?? (body.role === "owner" ? "owner" : "farmer");
     const { user, isNew } = await findOrCreateUser({
       id: supabaseUserId,

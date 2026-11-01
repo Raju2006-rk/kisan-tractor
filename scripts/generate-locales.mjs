@@ -27,6 +27,7 @@ console.log(`English keys: ${keys.length}`);
 const SEP = "[[[KTSEP]]]";
 const FALLBACK = { brx: "hi", ks: "ur", mni: "bn" };
 const TARGETS = [
+  "hi", "mr",
   "as", "bn", "brx", "doi", "gu", "kn", "ks", "kok", "mai", "ml",
   "mni", "ne", "or", "pa", "sa", "sat", "sd", "ta", "te", "ur",
 ];

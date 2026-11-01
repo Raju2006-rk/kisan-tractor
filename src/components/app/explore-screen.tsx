@@ -42,7 +42,7 @@ type Sort = "nearest" | "price";
 const SERVICE_AREA_KM = 50;
 
 export function ExploreScreen({ user }: { user: SessionUser }) {
-  const { t } = useI18n();
+  const { t, serviceLabel } = useI18n();
   const { push } = useToast();
   const [query, setQuery] = useState("");
   const [service, setService] = useState<ServiceType | "all">("all");
@@ -59,6 +59,16 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
     : { lat: VILLAGES[0].lat, lng: VILLAGES[0].lng };
   const [coords, setCoords] = useState(center);
   const [locationLabel, setLocationLabel] = useState(profile?.village ?? "Niphad");
+  const areaLabel =
+    [profile?.village, profile?.district, profile?.state]
+      .filter(Boolean)
+      .join(" · ") || "Niphad · Nashik · Maharashtra";
+  const pricingLabel = (item: PricingType) =>
+    item === "hourly"
+      ? t("app.hourly")
+      : item === "acre"
+        ? t("app.perAcre")
+        : t("app.perTrip");
 
   const key = useMemo(() => {
     const params = new URLSearchParams();
@@ -108,11 +118,11 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
 
   function useMyLocation() {
     if (typeof window !== "undefined" && !window.isSecureContext) {
-      push("Location needs a secure https connection. Choose your village in Profile.", "error");
+      push(t("app.locationNeedsHttps"), "error");
       return;
     }
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      push("Your browser cannot detect location. Choose your village in Profile.", "error");
+      push(t("app.browserNoLocation"), "error");
       return;
     }
     setLocating(true);
@@ -124,23 +134,23 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
 
         try {
           const geo = await reverseGeocode(lat, lng);
-          setLocationLabel(geo.village || "your location");
+          setLocationLabel(geo.village || t("app.yourLocation"));
         } catch {
-          setLocationLabel("your location");
+          setLocationLabel(t("app.yourLocation"));
         } finally {
           setLocating(false);
         }
 
-        push("Showing tractors near your current location.", "success");
+        push(t("app.showingNearLocation"), "success");
       },
       (positionError) => {
         setLocating(false);
         push(
           positionError.code === positionError.PERMISSION_DENIED
-            ? "Location permission is blocked. Allow location for this site, or choose your village in Profile."
+            ? t("app.locationBlocked")
             : positionError.code === positionError.TIMEOUT
-              ? "Location took too long. Try again, or choose your village in Profile."
-              : "Could not read your location. Choose your village in Profile.",
+              ? t("app.locationTimeout")
+              : t("app.locationFailed"),
           "error",
         );
       },
@@ -157,7 +167,7 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
               {t("app.farmerTag")}
             </Badge>
             <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone/70">
-              Niphad · Nashik · Maharashtra
+              {areaLabel}
             </span>
           </div>
           <h1 className="mt-2 font-display text-3xl text-forest sm:text-[2.4rem]">
@@ -175,7 +185,7 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
             className="hidden sm:inline-flex"
           >
             <LocateFixed className="size-3.5" />
-            {locating ? "Locating…" : "Use my location"}
+            {locating ? t("common.locating") : t("common.useMyLocation")}
           </Button>
           <div className="flex rounded-full border border-line bg-paper p-1">
             <button
@@ -215,7 +225,7 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
             {query ? (
               <button
                 type="button"
-                aria-label="Clear search"
+                aria-label={t("common.search")}
                 onClick={() => setQuery("")}
                 className="text-stone/60 hover:text-forest"
               >
@@ -225,7 +235,7 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
           </label>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:w-auto">
             <Select
-              aria-label="Distance"
+              aria-label={t("app.distance")}
               value={distance}
               onChange={(event) => setDistance(event.target.value)}
               className="h-11 bg-cream/50 text-xs"
@@ -236,7 +246,7 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
               <option value="25">{t("app.within25")}</option>
             </Select>
             <Select
-              aria-label="Sort"
+              aria-label={t("app.sortNearest")}
               value={sort}
               onChange={(event) => setSort(event.target.value as Sort)}
               className="h-11 bg-cream/50 text-xs"
@@ -250,7 +260,7 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
               disabled={!hasFilters}
               className="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-paper px-3 text-xs font-semibold text-stone transition hover:border-forest/25 hover:text-forest disabled:opacity-40"
             >
-              <SlidersHorizontal className="size-3.5" /> Reset
+              <SlidersHorizontal className="size-3.5" /> {t("common.reset")}
             </button>
           </div>
         </div>
@@ -266,7 +276,7 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
                 : "border-line bg-cream/40 text-stone hover:border-forest/25 hover:text-forest",
             )}
           >
-            All work
+            {t("app.allWork")}
           </button>
           {SERVICES.map((item) => (
             <button
@@ -280,7 +290,7 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
                   : "border-line bg-cream/40 text-stone hover:border-forest/25 hover:text-forest",
               )}
             >
-              {item.name}
+              {serviceLabel(item.id)}
             </button>
           ))}
           <span className="mx-1 w-px shrink-0 bg-line" />
@@ -294,7 +304,7 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
                 : "border-line bg-cream/40 text-stone hover:border-clay/25 hover:text-clay-dark",
             )}
           >
-            Any rate
+            {t("app.anyRate")}
           </button>
           {(["hourly", "acre", "trip"] as PricingType[]).map((item) => (
             <button
@@ -302,13 +312,13 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
               type="button"
               onClick={() => setPricing(item)}
               className={cn(
-                "shrink-0 rounded-full border px-3 py-1.5 text-[0.7rem] font-semibold capitalize transition",
+                "shrink-0 rounded-full border px-3 py-1.5 text-[0.7rem] font-semibold transition",
                 pricing === item
                   ? "border-clay/30 bg-clay/10 text-clay-dark"
                   : "border-line bg-cream/40 text-stone hover:border-clay/25 hover:text-clay-dark",
               )}
             >
-              {item}
+              {pricingLabel(item)}
             </button>
           ))}
         </div>
@@ -317,18 +327,21 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-semibold text-stone">
           {isLoading ? (
-            "Finding nearby tractors…"
+            t("app.findingTractors")
           ) : (
-            <>
-              <span className="text-forest">{tractors.length}</span>{" "}
-              {tractors.length === 1 ? "tractor" : "tractors"} available near{" "}
-              {locationLabel}
-            </>
+            <>{t("app.tractorsAvailableNear", {
+              count: tractors.length,
+              tractorWord:
+                tractors.length === 1
+                  ? t("app.tractorSingular")
+                  : t("app.tractorPlural"),
+              location: locationLabel,
+            })}</>
           )}
         </p>
         <p className="inline-flex items-center gap-1.5 text-[0.65rem] text-stone/70">
           <span className="size-1.5 rounded-full bg-forest pulse-ring" />
-          Showing owners online for new requests
+          {t("app.showingOnline")}
         </p>
       </div>
 
@@ -336,7 +349,7 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
         <EmptyState
           icon={<Compass className="size-5" />}
           title={t("common.somethingWentWrong")}
-          body={error instanceof Error ? error.message : "Please try again."}
+          body={error instanceof Error ? error.message : t("common.tryAgain")}
           action={
             <button type="button" onClick={resetFilters} className={buttonStyles("outline", "sm")}>
               {t("common.tryAgain")}
@@ -355,10 +368,10 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
         <EmptyState
           icon={<Tractor className="size-5" />}
           title={t("common.noResults")}
-          body="Try a wider distance, another service, or a different village. Owners who are offline are hidden until they come back online."
+          body={t("app.noResultsBody")}
           action={
             <button type="button" onClick={resetFilters} className={buttonStyles("primary", "sm")}>
-              Clear filters <X className="size-3.5" />
+              {t("app.clearFilters")} <X className="size-3.5" />
             </button>
           }
         />
@@ -373,15 +386,14 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
                 <MapPin className="size-4" />
               </span>
               <div>
-                <p className="text-sm font-semibold text-forest">Can’t find the right tractor?</p>
+                <p className="text-sm font-semibold text-forest">{t("app.cantFindTractor")}</p>
                 <p className="mt-0.5 text-[0.7rem] leading-relaxed text-stone">
-                  Owners who are offline are not shown. Check again later or ask a neighbour for a
-                  local owner’s number.
+                  {t("app.cantFindTractorBody")}
                 </p>
               </div>
             </div>
             <Link href="/help" className={buttonStyles("outline", "sm", "shrink-0")}>
-              Help <ArrowRight className="size-3.5" />
+              {t("common.help")} <ArrowRight className="size-3.5" />
             </Link>
           </div>
         </div>

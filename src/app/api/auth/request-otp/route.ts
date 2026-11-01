@@ -8,6 +8,7 @@ import {
   normalizeMobile,
   rememberDevice,
   sendSupabaseOtp,
+  validateStoredIdentity,
 } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { handleApiError, jsonError, readJson } from "@/lib/http";
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
   try {
     const body = await readJson<{
       mobile?: string;
+      name?: string;
       role?: Role;
       language?: Language;
     }>(request);
@@ -31,6 +33,17 @@ export async function POST(request: Request) {
     const role: Role | null = existing?.role ?? body.role ?? null;
     if (!existing && !role) {
       return jsonError("Please choose whether you are a farmer or tractor owner.", 400);
+    }
+
+    // A returning user must still type the name saved for this mobile number.
+    // This blocks signing into an account with someone else's name or a phone
+    // number that does not belong to the stored account.
+    const identity = await validateStoredIdentity(mobile, body.name);
+    if (!identity.ok) {
+      return NextResponse.json(
+        { error: identity.reason, code: "identity_mismatch" },
+        { status: 400 },
+      );
     }
 
     // A browser that already completed an OTP for this exact account is

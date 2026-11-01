@@ -162,43 +162,93 @@ export type ReverseGeocodeResult = {
   pincode: string;
   district: string;
   state: string;
+  provider?: "google" | "openstreetmap" | "coordinates";
 };
 
+async function reverseWithOpenStreetMap(
+  lat: number,
+  lng: number,
+): Promise<ReverseGeocodeResult | null> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=18&lat=${lat}&lon=${lng}`,
+      { headers: { "Accept-Language": "en" } },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      display_name?: string;
+      address?: Record<string, string>;
+    };
+    const addr = data.address || {};
+    const village =
+      addr.village ||
+      addr.hamlet ||
+      addr.suburb ||
+      addr.neighbourhood ||
+      addr.town ||
+      addr.municipality ||
+      addr.city ||
+      "";
+    const pincode = addr.postcode || "";
+    const district =
+      addr.state_district || addr.county || addr.city_district || addr.city || "";
+    const state = addr.state || "";
+    const address =
+      data.display_name ||
+      [village, district, state, pincode].filter(Boolean).join(", ");
+    if (!address && !village) return null;
+    return {
+      address,
+      village,
+      pincode,
+      district,
+      state,
+      provider: "openstreetmap",
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve GPS coordinates to an Indian address. The server route uses Google
+ * Geocoding when a key is configured and falls back to OpenStreetMap, so the
+ * browser never depends on a single provider.
+ */
 export async function reverseGeocode(
   lat: number,
   lng: number,
 ): Promise<ReverseGeocodeResult> {
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
-      { headers: { "Accept-Language": "en" } },
+      `/api/geo/reverse?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`,
+      { headers: { Accept: "application/json" } },
     );
-    if (!res.ok) throw new Error("Reverse geocode failed");
-    const data = await res.json();
-    const addr = data.address || {};
-    const village =
-      addr.village ||
-      addr.suburb ||
-      addr.town ||
-      addr.neighbourhood ||
-      addr.hamlet ||
-      addr.city_district ||
-      addr.county ||
-      addr.city ||
-      "";
-    const pincode = addr.postcode || "";
-    const district = addr.state_district || addr.county || addr.city || "";
-    const state = addr.state || "";
-    const address = data.display_name || "";
-    return { address, village, pincode, district, state };
+    if (res.ok) {
+      const data = (await res.json()) as Partial<ReverseGeocodeResult>;
+      const result: ReverseGeocodeResult = {
+        address: data.address ?? "",
+        village: data.village ?? "",
+        pincode: data.pincode ?? "",
+        district: data.district ?? "",
+        state: data.state ?? "",
+        provider: data.provider,
+      };
+      if (result.address || result.village) return result;
+    }
   } catch (err) {
-    console.warn("Reverse geocode failed, using coordinates fallback:", err);
-    return {
-      address: `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-      village: "",
-      pincode: "",
-      district: "",
-      state: "",
-    };
+    console.warn("Server reverse geocode failed, trying OpenStreetMap directly:", err);
   }
+
+  const direct = await reverseWithOpenStreetMap(lat, lng);
+  if (direct) return direct;
+
+  return {
+    address: `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+    village: "",
+    pincode: "",
+    district: "",
+    state: "",
+    provider: "coordinates",
+  };
 }

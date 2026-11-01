@@ -2,6 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap, Marker } from "leaflet";
+import {
+  hasGoogleMapsKey,
+  loadGoogleMaps,
+  type GoogleInfoWindow,
+  type GoogleMap,
+  type GoogleMarker,
+} from "@/lib/google-maps";
 import type { LiveLocation } from "@/lib/types";
 
 function escapeHtml(value: string) {
@@ -17,6 +24,160 @@ const farmIconHtml = `<span style="display:flex;align-items:center;justify-conte
 const farmerIconHtml = `<span style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:999px;background:#c06a3e;border:3px solid #f7f2e6;box-shadow:0 6px 18px -6px rgba(192,106,62,.8);color:#fff;font-size:13px;">●</span>`;
 
 export default function FarmerLocationMap({
+  farm,
+  farmer,
+}: {
+  farm: { lat: number; lng: number; label: string; village: string };
+  farmer?: LiveLocation | null;
+}) {
+  const [googleFailed, setGoogleFailed] = useState(false);
+  const useGoogle = hasGoogleMapsKey() && !googleFailed;
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-line bg-sand">
+      {useGoogle ? (
+        <GoogleFarmerLocationMap
+          farm={farm}
+          farmer={farmer}
+          onError={() => setGoogleFailed(true)}
+        />
+      ) : (
+        <LeafletFarmerLocationMap farm={farm} farmer={farmer} />
+      )}
+      <div className="pointer-events-none absolute left-2.5 top-2.5 z-[500] flex flex-wrap items-center gap-2 rounded-full border border-forest/10 bg-paper/95 px-2.5 py-1 text-[0.6rem] font-semibold text-forest shadow-sm backdrop-blur">
+        <span className="inline-flex items-center gap-1">
+          <span className="size-1.5 rounded-full bg-forest" /> Farm land
+        </span>
+        {farmer ? (
+          <span className="inline-flex items-center gap-1">
+            <span className="size-1.5 rounded-full bg-clay" /> Farmer GPS
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function GoogleFarmerLocationMap({
+  farm,
+  farmer,
+  onError,
+}: {
+  farm: { lat: number; lng: number; label: string; village: string };
+  farmer?: LiveLocation | null;
+  onError: () => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<GoogleMap | null>(null);
+  const farmMarkerRef = useRef<GoogleMarker | null>(null);
+  const farmerMarkerRef = useRef<GoogleMarker | null>(null);
+  const infoRef = useRef<GoogleInfoWindow | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadGoogleMaps()
+      .then((google) => {
+        if (cancelled || !containerRef.current || mapRef.current) return;
+        const map = new google.maps.Map(containerRef.current, {
+          center: { lat: farm.lat, lng: farm.lng },
+          zoom: 14,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+          clickableIcons: false,
+          gestureHandling: "cooperative",
+        });
+        mapRef.current = map;
+        infoRef.current = new google.maps.InfoWindow();
+
+        const farmMarker = new google.maps.Marker({
+          position: { lat: farm.lat, lng: farm.lng },
+          map,
+          title: farm.label,
+          label: "F",
+        });
+        farmMarker.addListener("click", () => {
+          infoRef.current?.setContent(
+            `<div style="font-family:Manrope,sans-serif;min-width:170px;padding:2px 0;">
+              <div style="font-family:Fraunces,Georgia,serif;font-size:15px;color:#163b2a;">${escapeHtml(
+                farm.label,
+              )}</div>
+              <div style="margin-top:2px;font-size:11px;color:#667066;">${escapeHtml(
+                farm.village,
+              )} · Farm land</div>
+            </div>`,
+          );
+          infoRef.current?.open({ map, anchor: farmMarker });
+        });
+        farmMarkerRef.current = farmMarker;
+        setReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) onError();
+      });
+
+    return () => {
+      cancelled = true;
+      farmMarkerRef.current?.setMap(null);
+      farmerMarkerRef.current?.setMap(null);
+      farmMarkerRef.current = null;
+      farmerMarkerRef.current = null;
+      infoRef.current?.close();
+      infoRef.current = null;
+      mapRef.current = null;
+      setReady(false);
+    };
+    // The map shell is created once; the marker effect below keeps positions fresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const google = typeof window !== "undefined" ? window.google : undefined;
+    const map = mapRef.current;
+    if (!ready || !google || !map) return;
+
+    if (!farmer) {
+      farmerMarkerRef.current?.setMap(null);
+      farmerMarkerRef.current = null;
+      map.setCenter({ lat: farm.lat, lng: farm.lng });
+      return;
+    }
+
+    if (!farmerMarkerRef.current) {
+      const marker = new google.maps.Marker({
+        position: { lat: farmer.lat, lng: farmer.lng },
+        map,
+        title: "Farmer live location",
+        label: "L",
+      });
+      marker.addListener("click", () => {
+        infoRef.current?.setContent(
+          `<div style="font-family:Manrope,sans-serif;min-width:150px;padding:2px 0;">
+            <div style="font-size:12px;font-weight:800;color:#163b2a;">Farmer live location</div>
+            <div style="margin-top:2px;font-size:11px;color:#667066;">Shared for this booking</div>
+          </div>`,
+        );
+        infoRef.current?.open({ map, anchor: marker });
+      });
+      farmerMarkerRef.current = marker;
+
+      const bounds = new google.maps.LatLngBounds();
+      bounds.extend({ lat: farm.lat, lng: farm.lng });
+      bounds.extend({ lat: farmer.lat, lng: farmer.lng });
+      if (!bounds.isEmpty()) map.fitBounds(bounds, 50);
+    } else {
+      farmerMarkerRef.current.setPosition({
+        lat: farmer.lat,
+        lng: farmer.lng,
+      });
+    }
+  }, [farm.lat, farm.lng, farmer, ready]);
+
+  return <div ref={containerRef} className="h-56 w-full" />;
+}
+
+function LeafletFarmerLocationMap({
   farm,
   farmer,
 }: {
@@ -130,19 +291,5 @@ export default function FarmerLocationMap({
     }
   }, [farm.lat, farm.lng, farmer, ready]);
 
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-line bg-sand">
-      <div ref={containerRef} className="h-56 w-full" />
-      <div className="pointer-events-none absolute left-2.5 top-2.5 z-[500] flex flex-wrap items-center gap-2 rounded-full border border-forest/10 bg-paper/95 px-2.5 py-1 text-[0.6rem] font-semibold text-forest shadow-sm backdrop-blur">
-        <span className="inline-flex items-center gap-1">
-          <span className="size-1.5 rounded-full bg-forest" /> Farm land
-        </span>
-        {farmer ? (
-          <span className="inline-flex items-center gap-1">
-            <span className="size-1.5 rounded-full bg-clay" /> Farmer GPS
-          </span>
-        ) : null}
-      </div>
-    </div>
-  );
+  return <div ref={containerRef} className="h-56 w-full" />;
 }

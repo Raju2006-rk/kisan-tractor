@@ -21,13 +21,19 @@ import {
 } from "lucide-react";
 import { BookingActions, useWorkMinutes } from "@/components/app/booking-actions";
 import { BookingCard } from "@/components/app/booking-card";
+import { OwnerEarningsCard } from "@/components/app/owner-earnings";
 import { TractorCard } from "@/components/app/tractor-card";
 import { Badge, buttonStyles, Card, EmptyState, Skeleton, StatusBadge } from "@/components/ui/primitives";
 import { Photo } from "@/components/ui/photo";
 import { PRICING_UNITS } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 import { formatRupees, minutesToHoursLabel } from "@/lib/pricing";
-import type { BookingDetail, SessionUser, TractorWithOwner } from "@/lib/types";
+import type {
+  BookingDetail,
+  OwnerEarningsSummary,
+  SessionUser,
+  TractorWithOwner,
+} from "@/lib/types";
 import { cn, formatDateTime, relativeDay } from "@/lib/utils";
 
 type BookingsResponse = { bookings: BookingDetail[] };
@@ -80,7 +86,7 @@ export function FarmerDashboard({ user }: { user: SessionUser }) {
             <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone/70">
               {user.farmerProfile?.village
                 ? `${user.farmerProfile.village}${user.farmerProfile.district ? `, ${user.farmerProfile.district}` : ""}`
-                : "Location not set"}
+                : t("common.locationNotSet")}
             </span>
           </div>
           <h1 className="mt-2 font-display text-3xl text-forest sm:text-[2.4rem]">
@@ -102,7 +108,7 @@ export function FarmerDashboard({ user }: { user: SessionUser }) {
           <div className="relative">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-wheat/80">
-                {active ? t("app.activeBooking") : "Your farm work"}
+                {active ? t("app.activeBooking") : t("app.farmWork")}
               </span>
               {active ? <StatusBadge status={active.status} role="farmer" className="!border-cream/15 !bg-cream/10 !text-cream" /> : null}
             </div>
@@ -121,7 +127,7 @@ export function FarmerDashboard({ user }: { user: SessionUser }) {
                   {t("app.noActiveWork")}
                 </h2>
                 <p className="mt-2 max-w-md text-sm leading-relaxed text-cream/65">
-                  Find a nearby tractor, see the rate before you book, and pay the owner directly when the work is done.
+                  {t("app.noActiveWorkBody")}
                 </p>
                 <Link href="/explore" className={buttonStyles("secondary", "md", "mt-5")}>
                   {t("app.findTractorTitle")} <ArrowRight className="size-4" />
@@ -141,7 +147,7 @@ export function FarmerDashboard({ user }: { user: SessionUser }) {
                 <Compass className="size-4" />
               </span>
               <p className="mt-2 text-sm font-semibold text-forest">{t("nav.explore")}</p>
-              <p className="mt-0.5 text-[0.68rem] text-stone">Find nearby tractors</p>
+              <p className="mt-0.5 text-[0.68rem] text-stone">{t("app.findNearbyTractors")}</p>
             </div>
             <ArrowUpRight className="size-4 text-stone transition group-hover:text-clay" />
           </Link>
@@ -154,7 +160,7 @@ export function FarmerDashboard({ user }: { user: SessionUser }) {
                 <UserRound className="size-4" />
               </span>
               <p className="mt-2 text-sm font-semibold text-forest">{t("app.bookForSomeone")}</p>
-              <p className="mt-0.5 text-[0.68rem] text-stone">For family · no account needed</p>
+              <p className="mt-0.5 text-[0.68rem] text-stone">{t("app.forFamilyNoAccount")}</p>
             </div>
             <ArrowUpRight className="size-4 text-stone transition group-hover:text-clay" />
           </Link>
@@ -170,7 +176,9 @@ export function FarmerDashboard({ user }: { user: SessionUser }) {
               <p className="mt-0.5 text-[0.68rem] text-stone">
                 {isLoading
                   ? t("common.loading")
-                  : `${bookings.length} booking${bookings.length === 1 ? "" : "s"} on record`}
+                  : bookings.length === 1
+                    ? t("app.bookingOnRecordOne")
+                    : t("app.bookingsOnRecord", { count: bookings.length })}
               </p>
             </div>
             <ArrowUpRight className="size-4 text-stone transition group-hover:text-clay" />
@@ -181,7 +189,7 @@ export function FarmerDashboard({ user }: { user: SessionUser }) {
       {upcoming.length > 0 ? (
         <section>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-xl text-forest">Upcoming work</h2>
+            <h2 className="font-display text-xl text-forest">{t("app.upcomingWork")}</h2>
             <Link href="/bookings" className="text-xs font-semibold text-forest hover:text-clay">
               {t("common.viewAll")} →
             </Link>
@@ -216,20 +224,20 @@ export function FarmerDashboard({ user }: { user: SessionUser }) {
       <div className="grid gap-3 md:grid-cols-3">
         {[
           {
-            title: "Hourly",
-            body: "Only active work time is billed. Pauses are recorded separately.",
+            title: t("app.hourly"),
+            body: t("app.hourlyBody"),
             example: "₹800 / hour",
             icon: Clock3,
           },
           {
-            title: "Per acre",
-            body: "The owner records completed acres. The agreed rate stays fixed.",
+            title: t("app.perAcre"),
+            body: t("app.perAcreBody"),
             example: "₹1,200 / acre",
             icon: Tractor,
           },
           {
-            title: "Per trip",
-            body: "Pay for completed trips, agreed before the booking starts.",
+            title: t("app.perTrip"),
+            body: t("app.perTripBody"),
             example: "₹1,500 / trip",
             icon: ReceiptText,
           },
@@ -258,7 +266,7 @@ export function FarmerDashboard({ user }: { user: SessionUser }) {
           </div>
         </div>
         <Link href="/help#billing" className={buttonStyles("outline", "sm", "shrink-0")}>
-          How payment works <ArrowRight className="size-3.5" />
+          {t("app.howPaymentWorks")} <ArrowRight className="size-3.5" />
         </Link>
       </div>
     </div>
@@ -294,7 +302,7 @@ function ActiveFarmerJob({
         </div>
         <div className="rounded-xl border border-cream/12 bg-cream/8 px-3 py-2 text-right">
           <p className="text-[0.55rem] font-bold uppercase tracking-[0.14em] text-cream/50">
-            {booking.finalAmount !== null ? "Final bill" : "Estimate"}
+            {booking.finalAmount !== null ? t("app.finalBill") : t("app.estimateLabel")}
           </p>
           <p className="font-display text-xl text-cream">{formatRupees(amount)}</p>
         </div>
@@ -302,26 +310,26 @@ function ActiveFarmerJob({
 
       {isPaused ? (
         <div className="mt-4 rounded-2xl border border-wheat/30 bg-wheat/10 px-3.5 py-3 text-[0.7rem] leading-relaxed text-cream/80">
-          Work is paused. Active time has stopped; break time is recorded separately and not billed. You’ll see an update when work restarts.
+          {t("app.workPausedBody")}
         </div>
       ) : null}
 
       <div className="mt-4 grid grid-cols-3 gap-2">
         <div className="rounded-xl bg-cream/8 px-3 py-2.5">
           <p className="text-[0.55rem] font-bold uppercase tracking-[0.12em] text-cream/45">
-            Active
+            {t("app.activeLabel")}
           </p>
           <p className="mt-0.5 font-display text-lg text-cream">{minutesToHoursLabel(minutes)}</p>
         </div>
         <div className="rounded-xl bg-cream/8 px-3 py-2.5">
           <p className="text-[0.55rem] font-bold uppercase tracking-[0.12em] text-cream/45">
-            Break
+            {t("app.breakLabel")}
           </p>
           <p className="mt-0.5 font-display text-lg text-cream">{minutesToHoursLabel(breakMinutes)}</p>
         </div>
         <div className="rounded-xl bg-cream/8 px-3 py-2.5">
           <p className="text-[0.55rem] font-bold uppercase tracking-[0.12em] text-cream/45">
-            Rate
+            {t("app.rateLabel")}
           </p>
           <p className="mt-0.5 font-display text-lg text-cream">
             {formatRupees(booking.agreedRate)}
@@ -352,6 +360,7 @@ type OwnerDashboardResponse = {
     upcoming: number;
     completed: number;
     recordedEarnings: number;
+    earnings: OwnerEarningsSummary;
     bookings: BookingDetail[];
   };
 };
@@ -422,7 +431,7 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
             <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone/70">
               {user.ownerProfile?.village
                 ? `${user.ownerProfile.village}${user.ownerProfile.district ? `, ${user.ownerProfile.district}` : ""}`
-                : "Location not set"}
+                : t("common.locationNotSet")}
             </span>
           </div>
           <h1 className="mt-2 font-display text-3xl text-forest sm:text-[2.4rem]">
@@ -450,6 +459,12 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
         ))}
       </div>
 
+      {dashboard?.earnings ? (
+        <OwnerEarningsCard earnings={dashboard.earnings} />
+      ) : isLoading ? (
+        <Skeleton className="h-72" />
+      ) : null}
+
       {isLoading ? (
         <Skeleton className="h-56" />
       ) : active ? (
@@ -461,9 +476,9 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
               <Tractor className="size-4" />
             </span>
             <div>
-              <p className="font-display text-xl text-forest">No active job right now.</p>
+              <p className="font-display text-xl text-forest">{t("app.noActiveJob")}</p>
               <p className="mt-1 max-w-lg text-xs leading-relaxed text-stone">
-                Keep your availability on to receive local booking requests. Accepted and upcoming work appears here.
+                {t("app.noActiveJobBody")}
               </p>
             </div>
           </div>
@@ -477,9 +492,9 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
         <Card className="overflow-hidden border-wheat/60">
           <div className="flex items-center justify-between gap-2 border-b border-wheat/40 bg-wheat/15 px-4 py-3">
             <div>
-              <h2 className="font-display text-lg text-forest">Payments to confirm</h2>
+              <h2 className="font-display text-lg text-forest">{t("app.paymentsToConfirm")}</h2>
               <p className="text-[0.65rem] text-stone">
-                Mark payment done only after the money reaches your UPI, bank account or hand.
+                {t("app.paymentsToConfirmBody")}
               </p>
             </div>
             <Badge tone="clay">{paymentPending.length}</Badge>
@@ -496,11 +511,16 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
                     {booking.farmer.name} · {booking.serviceLocation.village}
                   </p>
                   <p className="text-[0.62rem] text-stone">
-                    {booking.id} · {formatRupees(booking.finalAmount ?? booking.estimatedAmount)} due
+                    {booking.id} ·{" "}
+                    {t("app.due", {
+                      amount: formatRupees(
+                        booking.finalAmount ?? booking.estimatedAmount,
+                      ),
+                    })}
                   </p>
                 </div>
                 <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-forest px-2.5 py-1 text-[0.62rem] font-semibold text-cream">
-                  Mark payment done <ArrowRight className="size-3" />
+                  {t("app.markPaymentDone")} <ArrowRight className="size-3" />
                 </span>
               </Link>
             ))}
@@ -523,8 +543,8 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
             {requests.length === 0 ? (
               <EmptyState
                 icon={<CalendarDays className="size-5" />}
-                title="No new requests"
-                body="When a nearby farmer sends a booking request, it will appear here for you to accept or reject."
+                title={t("app.noNewRequests")}
+                body={t("app.noNewRequestsBody")}
               />
             ) : (
               requests.map((booking) => (
@@ -543,7 +563,7 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
         <div className="space-y-4">
           <Card className="overflow-hidden">
             <div className="flex items-center justify-between px-4 pt-4">
-              <h2 className="font-display text-lg text-forest">Your tractor</h2>
+              <h2 className="font-display text-lg text-forest">{t("app.yourTractor")}</h2>
               <Link href="/owner/tractor" className="text-[0.65rem] font-semibold text-forest hover:text-clay">
                 {t("common.edit")} →
               </Link>
@@ -566,7 +586,7 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
                     </p>
                   </div>
                   <Badge tone={tractor.isAvailable ? "green" : "stone"} dot>
-                    {tractor.isAvailable ? "Available" : "Offline"}
+                    {tractor.isAvailable ? t("common.available") : t("common.offline")}
                   </Badge>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
@@ -583,9 +603,7 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
               </div>
             ) : (
               <div className="p-4">
-                <p className="text-xs text-stone">
-                  List your tractor, equipment and rates to receive local work.
-                </p>
+                <p className="text-xs text-stone">{t("app.listTractorBody")}</p>
                 <Link href="/owner/tractor" className={buttonStyles("primary", "sm", "mt-3")}>
                   <Plus className="size-3.5" /> {t("app.ownerTractorAdd")}
                 </Link>
@@ -595,13 +613,13 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
 
           <Card className="p-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-lg text-forest">Upcoming jobs</h2>
+              <h2 className="font-display text-lg text-forest">{t("app.upcomingJobs")}</h2>
               <Link href="/bookings" className="text-[0.65rem] font-semibold text-forest hover:text-clay">
                 {t("common.viewAll")} →
               </Link>
             </div>
             {upcoming.length === 0 ? (
-              <p className="mt-2 text-xs text-stone">No upcoming jobs. Accepted requests will appear here.</p>
+              <p className="mt-2 text-xs text-stone">{t("app.noUpcomingJobs")}</p>
             ) : (
               <div className="mt-3 space-y-2">
                 {upcoming.slice(0, 3).map((booking) => (
@@ -631,10 +649,8 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
       <section>
         <div className="mb-3 flex items-end justify-between">
           <div>
-            <h2 className="font-display text-xl text-forest">Recent payments</h2>
-            <p className="text-xs text-stone">
-              Recorded earnings reflect payments you have confirmed receiving.
-            </p>
+            <h2 className="font-display text-xl text-forest">{t("app.recentPayments")}</h2>
+            <p className="text-xs text-stone">{t("app.ownerPaymentsSub")}</p>
           </div>
           <Link href="/owner/payments" className="text-xs font-semibold text-forest hover:text-clay">
             {t("common.viewAll")} →
@@ -643,8 +659,8 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
         {payments.length === 0 ? (
           <EmptyState
             icon={<Wallet className="size-5" />}
-            title="No payments recorded yet"
-            body="Payments you confirm from farmers will be listed here. KisanTractor does not hold or transfer your earnings."
+            title={t("app.noPaymentsRecorded")}
+            body={t("app.noPaymentsRecordedBody")}
           />
         ) : (
           <Card className="divide-y divide-line/70">
@@ -671,16 +687,18 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
                     </p>
                     <p className="text-[0.62rem] text-stone">
                       {payment.paymentStatus === "confirmed"
-                        ? "Marked done by owner"
-                        : "Payment note"} ·{" "}
-                      {formatDateTime(payment.confirmedAt ?? payment.paidAt)}
+                        ? t("app.markedDoneByOwner")
+                        : t("app.paymentNote")}{" "}
+                      · {formatDateTime(payment.confirmedAt ?? payment.paidAt)}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className="font-display text-lg text-forest">{formatRupees(payment.amount)}</p>
                   <p className="text-[0.6rem] text-stone">
-                    {payment.paymentStatus === "confirmed" ? "Received" : "Awaiting your confirmation"}
+                    {payment.paymentStatus === "confirmed"
+                      ? t("app.received")
+                      : t("app.awaitingYourConfirmation")}
                   </p>
                 </div>
               </div>
@@ -724,15 +742,15 @@ function OwnerActiveJob({
       <div className="grid gap-4 p-5 sm:grid-cols-[1fr_auto] sm:items-center">
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-xl bg-forest/6 px-3 py-2.5">
-            <p className="text-[0.55rem] font-bold uppercase tracking-[0.12em] text-stone">Active</p>
+            <p className="text-[0.55rem] font-bold uppercase tracking-[0.12em] text-stone">{t("app.activeLabel")}</p>
             <p className="mt-0.5 font-display text-lg text-forest">{minutesToHoursLabel(minutes)}</p>
           </div>
           <div className="rounded-xl bg-sand/50 px-3 py-2.5">
-            <p className="text-[0.55rem] font-bold uppercase tracking-[0.12em] text-stone">Break</p>
+            <p className="text-[0.55rem] font-bold uppercase tracking-[0.12em] text-stone">{t("app.breakLabel")}</p>
             <p className="mt-0.5 font-display text-lg text-forest">{minutesToHoursLabel(breakMinutes)}</p>
           </div>
           <div className="rounded-xl bg-forest/6 px-3 py-2.5">
-            <p className="text-[0.55rem] font-bold uppercase tracking-[0.12em] text-stone">Rate</p>
+            <p className="text-[0.55rem] font-bold uppercase tracking-[0.12em] text-stone">{t("app.rateLabel")}</p>
             <p className="mt-0.5 font-display text-lg text-forest">{formatRupees(booking.agreedRate)}</p>
           </div>
         </div>

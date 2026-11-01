@@ -18,6 +18,8 @@ import type {
   FarmerProfile,
   Language,
   Notification,
+  OwnerEarningRecord,
+  OwnerEarningsSummary,
   OwnerProfile,
   PaymentMethod,
   Pricing,
@@ -27,6 +29,7 @@ import type {
   SessionUser,
   StatusHistory,
   Tractor,
+  TractorEarnings,
   TractorWithOwner,
   UserDocuments,
   WorkSession,
@@ -1262,21 +1265,119 @@ export async function getOwnerDashboard(userId: string): Promise<{
   upcoming: number;
   completed: number;
   recordedEarnings: number;
+  earnings: OwnerEarningsSummary;
   bookings: BookingDetail[];
 }> {
   const bookings = await listBookingsForUser(userId);
   const ownerBookings = bookings.filter((b) => b.owner.id === userId);
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
-  const recordedEarnings = ownerBookings.reduce((sum, booking) => {
-    const confirmed = booking.payments
-      .filter((p) => p.paymentStatus === "confirmed")
-      .filter((p) => new Date(p.confirmedAt ?? p.paidAt) >= monthStart)
-      .reduce((s, p) => s + p.amount, 0);
-    return sum + confirmed;
-  }, 0);
   const db = await getDb();
+  const ownerTractors = db.tractors.filter((t) => t.ownerId === userId);
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const paidOn = (payment: { confirmedAt?: string | null; paidAt: string }) =>
+    new Date(payment.confirmedAt ?? payment.paidAt);
+
+  const confirmedRows = ownerBookings.flatMap((booking) =>
+    booking.payments
+      .filter((payment) => payment.paymentStatus === "confirmed")
+      .map((payment) => ({ booking, payment })),
+  );
+  const sum = (rows: typeof confirmedRows) =>
+    rows.reduce((total, row) => total + row.payment.amount, 0);
+
+  const totalEarned = sum(confirmedRows);
+  const thisMonthEarned = sum(
+    confirmedRows.filter((row) => paidOn(row.payment) >= monthStart),
+  );
+  const lastMonthEarned = sum(
+    confirmedRows.filter((row) => {
+      const paidAt = paidOn(row.payment);
+      return paidAt >= lastMonthStart && paidAt < monthStart;
+    }),
+  );
+  const pendingAmount = ownerBookings
+    .filter((booking) =>
+      ["BILL_GENERATED", "PAYMENT_PENDING"].includes(booking.status),
+    )
+    .reduce(
+      (total, booking) =>
+        total + (booking.finalAmount ?? booking.estimatedAmount),
+      0,
+    );
+  const completedJobs = ownerBookings.filter((booking) =>
+    ["PAID", "COMPLETED"].includes(booking.status),
+  ).length;
+
+  const byTractor: TractorEarnings[] = ownerTractors
+    .map((tractor) => {
+      const tractorBookings = ownerBookings.filter(
+        (booking) => booking.tractor.id === tractor.id,
+      );
+      const tractorConfirmed = confirmedRows.filter(
+        (row) => row.booking.tractor.id === tractor.id,
+      );
+      const lastPaidAt = tractorConfirmed.reduce<string | null>(
+        (latest, row) => {
+          const paidAt = row.payment.confirmedAt ?? row.payment.paidAt;
+          return !latest || paidAt > latest ? paidAt : latest;
+        },
+        null,
+      );
+      return {
+        tractorId: tractor.id,
+        brand: tractor.brand,
+        model: tractor.model,
+        registrationNumber: tractor.registrationNumber,
+        image: tractor.image,
+        total: sum(tractorConfirmed),
+        thisMonth: sum(
+          tractorConfirmed.filter((row) => paidOn(row.payment) >= monthStart),
+        ),
+        lastMonth: sum(
+          tractorConfirmed.filter((row) => {
+            const paidAt = paidOn(row.payment);
+            return paidAt >= lastMonthStart && paidAt < monthStart;
+          }),
+        ),
+        pending: tractorBookings
+          .filter((booking) =>
+            ["BILL_GENERATED", "PAYMENT_PENDING"].includes(booking.status),
+          )
+          .reduce(
+            (total, booking) =>
+              total + (booking.finalAmount ?? booking.estimatedAmount),
+            0,
+          ),
+        completedJobs: tractorBookings.filter((booking) =>
+          ["PAID", "COMPLETED"].includes(booking.status),
+        ).length,
+        lastPaidAt,
+      };
+    })
+    .sort((a, b) => b.total - a.total || a.brand.localeCompare(b.brand));
+
+  const recent: OwnerEarningRecord[] = ownerBookings
+    .flatMap((booking) =>
+      booking.payments.map((payment) => ({
+        paymentId: payment.id,
+        bookingId: booking.id,
+        amount: payment.amount,
+        paymentStatus: payment.paymentStatus,
+        paymentMethod: payment.paymentMethod,
+        paidAt: payment.paidAt,
+        confirmedAt: payment.confirmedAt ?? null,
+        farmerName: booking.farmer.name,
+        tractorId: booking.tractor.id,
+        tractorLabel: `${booking.tractor.brand} ${booking.tractor.model}`,
+      })),
+    )
+    .sort((a, b) =>
+      (b.confirmedAt ?? b.paidAt).localeCompare(a.confirmedAt ?? a.paidAt),
+    )
+    .slice(0, 10);
+
   return {
     tractorCount: db.tractors.filter(
       (t) => t.ownerId === userId && t.status === "active",
@@ -1286,7 +1387,17 @@ export async function getOwnerDashboard(userId: string): Promise<{
       ["ACCEPTED", "SCHEDULED"].includes(b.status),
     ).length,
     completed: ownerBookings.filter((b) => b.status === "COMPLETED").length,
-    recordedEarnings,
+    recordedEarnings: thisMonthEarned,
+    earnings: {
+      total: totalEarned,
+      thisMonth: thisMonthEarned,
+      lastMonth: lastMonthEarned,
+      pending: pendingAmount,
+      confirmedPayments: confirmedRows.length,
+      completedJobs,
+      byTractor,
+      recent,
+    },
     bookings: ownerBookings,
   };
 }

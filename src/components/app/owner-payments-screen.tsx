@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import useSWR from "swr";
 import {
   BadgeCheck,
   Check,
@@ -13,6 +14,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { OwnerEarningsCard } from "@/components/app/owner-earnings";
 import { Photo } from "@/components/ui/photo";
 import {
   Alert,
@@ -28,12 +30,15 @@ import {
 import { useToast } from "@/components/providers/app-providers";
 import { PAYMENT_METHODS } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
-import type { PaymentMethod, SessionUser } from "@/lib/types";
+import type { OwnerEarningsSummary, PaymentMethod, SessionUser } from "@/lib/types";
 
 export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
   const { t } = useI18n();
   const { push } = useToast();
   const router = useRouter();
+  const { data: dashboardData } = useSWR<{
+    dashboard: { earnings: OwnerEarningsSummary };
+  }>("/api/owner/dashboard", { refreshInterval: 30000 });
   const initial = user.ownerProfile?.payment;
   const [preferredMethod, setPreferredMethod] = useState<PaymentMethod>(
     initial?.preferredMethod ?? "upi",
@@ -60,12 +65,12 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
       body.append("file", file);
       const response = await fetch("/api/upload", { method: "POST", body });
       const result = (await response.json()) as { error?: string; url?: string };
-      if (!response.ok || !result.url) throw new Error(result.error ?? "Could not upload the QR image.");
+      if (!response.ok || !result.url) throw new Error(result.error ?? t("app.couldNotUploadQr"));
       setQrImage(result.url);
       setShareQr(true);
-      push("Payment QR uploaded.", "success");
+      push(t("app.paymentQrUploaded"), "success");
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "Could not upload the QR image.");
+      setError(uploadError instanceof Error ? uploadError.message : t("app.couldNotUploadQr"));
     } finally {
       setUploading(false);
     }
@@ -92,12 +97,12 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
         }),
       });
       const result = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Could not save payment details.");
+      if (!response.ok) throw new Error(result.error ?? t("app.couldNotSavePayment"));
       setSaved(true);
-      push("Payment details saved.", "success");
+      push(t("app.paymentDetailsSavedShort"), "success");
       router.refresh();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Could not save payment details.");
+      setError(saveError instanceof Error ? saveError.message : t("app.couldNotSavePayment"));
     } finally {
       setSaving(false);
     }
@@ -111,7 +116,7 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
         <div className="flex items-center gap-2">
           <Badge tone="green" dot>{t("app.ownerTag")}</Badge>
           <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone/70">
-            Direct payments
+            {t("app.directPayments")}
           </span>
         </div>
         <h1 className="mt-2 font-display text-3xl text-forest sm:text-[2.4rem]">
@@ -124,13 +129,12 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
         <Card className="p-4 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="eyebrow">Payment preferences</p>
+              <p className="eyebrow">{t("app.paymentPreferences")}</p>
               <h2 className="mt-1.5 font-display text-2xl text-forest">
                 {t("app.paymentDetailsTitle")}
               </h2>
               <p className="mt-1 text-xs leading-relaxed text-stone">
-                These details are shown only to a farmer who has a booking with you. Everything is
-                optional. Farmers can always pay cash or ask you directly.
+                {t("app.paymentDetailsBody")}
               </p>
             </div>
             <span className="flex size-10 items-center justify-center rounded-xl bg-forest/8 text-forest">
@@ -146,8 +150,7 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
           {saved ? (
             <Alert tone="success" className="mt-4">
               <span className="inline-flex items-center gap-1.5">
-                <Check className="size-3.5" /> Payment details saved. Farmers with an accepted
-                booking can now see the options you shared.
+                <Check className="size-3.5" /> {t("app.paymentDetailsSaved")}
               </span>
             </Alert>
           ) : null}
@@ -155,7 +158,7 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
           <div className="mt-5">
             <Field
               label={t("app.preferredMethod")}
-              hint="Shown as a suggestion to the farmer"
+              hint={t("app.preferredMethodHint")}
             >
               <Select
                 value={preferredMethod}
@@ -180,7 +183,7 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
                   <div>
                     <p className="text-sm font-semibold text-forest">{t("app.shareUpi")}</p>
                     <p className="mt-0.5 text-[0.65rem] leading-relaxed text-stone">
-                      A farmer can copy your UPI ID and pay from their own UPI app.
+                      {t("app.upiBody")}
                     </p>
                   </div>
                 </div>
@@ -209,8 +212,7 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
                   <div>
                     <p className="text-sm font-semibold text-forest">{t("app.shareQr")}</p>
                     <p className="mt-0.5 text-[0.65rem] leading-relaxed text-stone">
-                      Upload a screenshot of your own payment QR. Do not upload a QR that asks for a
-                      PIN or password.
+                      {t("app.qrBody")}
                     </p>
                   </div>
                 </div>
@@ -220,7 +222,7 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <Photo
                     src={qrImage}
-                    alt="Payment QR"
+                    alt={t("app.paymentQrAlt")}
                     className="h-28 w-28 shrink-0 rounded-xl border border-line"
                     sizes="112px"
                   />
@@ -247,7 +249,11 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
                       ) : (
                         <ImagePlus className="size-3.5" />
                       )}
-                      {uploading ? "Uploading…" : qrImage ? "Replace QR" : "Upload QR"}
+                      {uploading
+                        ? t("common.uploading")
+                        : qrImage
+                          ? t("app.replaceQr")
+                          : t("app.uploadQr")}
                     </button>
                     {qrImage ? (
                       <button
@@ -255,10 +261,10 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
                         onClick={() => setQrImage("")}
                         className="ml-2 text-[0.65rem] font-semibold text-clay hover:underline"
                       >
-                        Remove
+                        {t("common.remove")}
                       </button>
                     ) : null}
-                    <p className="mt-2 text-[0.6rem] text-stone">PNG, JPG or WebP · up to 5 MB.</p>
+                    <p className="mt-2 text-[0.6rem] text-stone">{t("app.fileTypes")}</p>
                   </div>
                 </div>
               ) : null}
@@ -273,8 +279,7 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
                   <div>
                     <p className="text-sm font-semibold text-forest">{t("app.shareBank")}</p>
                     <p className="mt-0.5 text-[0.65rem] leading-relaxed text-stone">
-                      Optional bank details for a direct transfer. KisanTractor never asks for a bank
-                      OTP, UPI PIN or password.
+                      {t("app.bankBody")}
                     </p>
                   </div>
                 </div>
@@ -282,26 +287,26 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
               </div>
               {shareBank ? (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <Field label="Account holder name" required className="sm:col-span-2">
+                  <Field label={t("app.accountHolder")} required className="sm:col-span-2">
                     <Input
                       value={bankAccountName}
                       onChange={(event) => setBankAccountName(event.target.value)}
-                      placeholder="Account holder name"
+                      placeholder={t("app.accountHolderPlaceholder")}
                       autoComplete="off"
                     />
                   </Field>
-                  <Field label="Account number" required>
+                  <Field label={t("app.accountNumber")} required>
                     <Input
                       value={bankAccountNumber}
                       onChange={(event) =>
                         setBankAccountNumber(event.target.value.replace(/[^\d\s]/g, ""))
                       }
-                      placeholder="1234 5678 9012"
+                      placeholder={t("app.accountNumberPlaceholder")}
                       inputMode="numeric"
                       autoComplete="off"
                     />
                   </Field>
-                  <Field label="IFSC code" required>
+                  <Field label={t("app.ifsc")} required>
                     <Input
                       value={bankIfsc}
                       onChange={(event) => setBankIfsc(event.target.value.toUpperCase())}
@@ -317,7 +322,7 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
 
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line/80 pt-4">
             <p className="text-[0.65rem] text-stone">
-              Changes apply to bookings immediately. Existing payment records are not changed.
+              {t("app.changesApply")}
             </p>
             <Button onClick={save} loading={saving}>
               <Check className="size-4" /> {t("common.save")}
@@ -326,45 +331,52 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
         </Card>
 
         <div className="space-y-3">
+          {dashboardData?.dashboard.earnings ? (
+            <OwnerEarningsCard
+              earnings={dashboardData.dashboard.earnings}
+              compact
+            />
+          ) : null}
+
           <Card className="overflow-hidden">
             <div className="bg-forest px-4 py-4 text-cream">
               <p className="text-[0.6rem] font-bold uppercase tracking-[0.16em] text-wheat/80">
-                Your current setting
+                {t("app.currentSetting")}
               </p>
               <p className="mt-1 font-display text-2xl text-cream">
-                {activeMethod?.label ?? "Direct payment"}
+                {activeMethod?.label ?? t("app.directPaymentFallback")}
               </p>
               <p className="mt-1 text-[0.65rem] leading-relaxed text-cream/55">
-                {activeMethod?.description ?? "Agreed directly with the farmer."}
+                {activeMethod?.description ?? t("app.agreedDirectly")}
               </p>
             </div>
             <div className="space-y-2 p-4 text-xs">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-stone">UPI</span>
                 <span className="font-semibold text-forest">
-                  {shareUpi && upiId ? "Shared" : "Not shared"}
+                  {shareUpi && upiId ? t("common.shared") : t("common.notShared")}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-stone">Payment QR</span>
+                <span className="text-stone">{t("app.paymentQr")}</span>
                 <span className="font-semibold text-forest">
-                  {shareQr && qrImage ? "Shared" : "Not shared"}
+                  {shareQr && qrImage ? t("common.shared") : t("common.notShared")}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-stone">Bank transfer</span>
+                <span className="text-stone">{t("app.bankTransfer")}</span>
                 <span className="font-semibold text-forest">
-                  {shareBank && bankAccountNumber ? "Shared" : "Not shared"}
+                  {shareBank && bankAccountNumber ? t("common.shared") : t("common.notShared")}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-2 border-t border-line/70 pt-2">
-                <span className="text-stone">Cash</span>
-                <span className="font-semibold text-forest">Always accepted</span>
+                <span className="text-stone">{t("app.cash")}</span>
+                <span className="font-semibold text-forest">{t("common.alwaysAccepted")}</span>
               </div>
             </div>
           </Card>
 
-          <Alert tone="warning" title="Never share secrets">
+          <Alert tone="warning" title={t("app.neverShareSecrets")}>
             <span className="flex items-start gap-2">
               <LockKeyhole className="mt-0.5 size-3.5 shrink-0" />
               <span>{t("app.paymentSafetyOwner")}</span>
@@ -373,37 +385,33 @@ export function OwnerPaymentsScreen({ user }: { user: SessionUser }) {
 
           <div className="rounded-2xl border border-line/70 bg-paper/60 p-4">
             <p className="flex items-center gap-1.5 text-[0.62rem] font-bold uppercase tracking-[0.14em] text-stone">
-              <ShieldCheck className="size-3.5" /> How confirmation works
+              <ShieldCheck className="size-3.5" /> {t("app.howConfirmationWorks")}
             </p>
             <ol className="mt-2 space-y-2 text-[0.66rem] leading-relaxed text-stone">
               <li className="flex gap-2">
                 <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-forest/10 text-[0.55rem] font-bold text-forest">
                   1
                 </span>
-                The farmer pays you directly using UPI, cash, bank transfer or another agreed method.
+                {t("app.confirmStep1")}
               </li>
               <li className="flex gap-2">
                 <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-forest/10 text-[0.55rem] font-bold text-forest">
                   2
                 </span>
-                Check your own UPI app, bank account or cash to confirm the money has arrived.
+                {t("app.confirmStep2")}
               </li>
               <li className="flex gap-2">
                 <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-forest/10 text-[0.55rem] font-bold text-forest">
                   3
                 </span>
-                Open the booking and tap Mark payment done. The booking then shows Payment Received
-                and is completed.
+                {t("app.confirmStep3")}
               </li>
             </ol>
           </div>
 
           <div className="flex items-center gap-2 rounded-2xl border border-forest/10 bg-forest/5 px-3.5 py-3 text-[0.66rem] leading-relaxed text-forest/80">
             <BadgeCheck className="size-4 shrink-0" />
-            <span>
-              KisanTractor does not hold your money and takes no commission. Your recorded earnings
-              reflect payments you have confirmed.
-            </span>
+            <span>{t("app.noCommissionNote")}</span>
           </div>
         </div>
       </div>

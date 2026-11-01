@@ -170,6 +170,124 @@ export function isValidMobile(mobile: string): boolean {
   return /^[6-9]\d{9}$/.test(mobile);
 }
 
+/**
+ * Shown when the name typed at sign-in does not belong to the account stored
+ * for that mobile number. The wording is intentionally explicit so a farmer
+ * can correct the entry without guessing what went wrong.
+ */
+export const IDENTITY_MISMATCH_MESSAGE =
+  "Enter invalid name or phone number, please enter correct to login";
+
+const GENERIC_NAMES = new Set([
+  "farmer",
+  "tractor owner",
+  "tractorowner",
+  "owner",
+  "user",
+  "kisan",
+]);
+
+function normalizeNameForMatch(value: string | null | undefined): string {
+  return (value ?? "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isMeaningfulName(value: string | null | undefined): boolean {
+  const normalized = normalizeNameForMatch(value);
+  return normalized.length > 1 && !GENERIC_NAMES.has(normalized);
+}
+
+export function namesMatch(
+  storedName: string | null | undefined,
+  providedName: string | null | undefined,
+): boolean {
+  const stored = normalizeNameForMatch(storedName);
+  const provided = normalizeNameForMatch(providedName);
+  if (!stored || !provided) return true;
+  if (stored === provided) return true;
+  // Accept a first name or a shorter form of the saved full name, but never a
+  // different person's name.
+  const storedParts = stored.split(" ");
+  const providedParts = provided.split(" ");
+  if (providedParts.length === 1) {
+    return storedParts.includes(provided);
+  }
+  if (storedParts.length === 1) {
+    return providedParts.includes(stored);
+  }
+  return false;
+}
+
+type SupabaseIdentity = { id: string; name: string | null };
+
+/** Look up the phone number in Supabase Auth (the authoritative account store). */
+async function findSupabaseIdentity(
+  mobile: string,
+): Promise<SupabaseIdentity | null> {
+  if (!isSupabaseDatabaseConfigured()) return null;
+  try {
+    const admin = getSupabaseAdmin();
+    const phoneVariants = [
+      `+91${mobile}`,
+      mobile,
+      `91${mobile}`,
+    ];
+    const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const authUser = data?.users?.find((user) =>
+      phoneVariants.includes(user.phone ?? ""),
+    );
+    if (!authUser) return null;
+    const metadata = authUser.user_metadata as Record<string, unknown> | undefined;
+    const name =
+      typeof metadata?.name === "string"
+        ? metadata.name
+        : typeof metadata?.full_name === "string"
+          ? metadata.full_name
+          : null;
+    return { id: authUser.id, name };
+  } catch (error) {
+    console.warn("[auth] Could not read Supabase identity:", error);
+    return null;
+  }
+}
+
+/**
+ * Reject a sign-in where the supplied name does not match the account already
+ * stored for that mobile number (local app_state or Supabase Auth metadata).
+ */
+export async function validateStoredIdentity(
+  mobile: string,
+  providedName?: string | null,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const provided = (providedName ?? "").trim();
+  if (!provided) return { ok: true };
+
+  const db = await getDb();
+  const existing = db.users.find((user) => user.mobile === mobile);
+  if (
+    existing &&
+    isMeaningfulName(existing.name) &&
+    !namesMatch(existing.name, provided)
+  ) {
+    return { ok: false, reason: IDENTITY_MISMATCH_MESSAGE };
+  }
+
+  const supabaseIdentity = await findSupabaseIdentity(mobile);
+  if (
+    supabaseIdentity?.name &&
+    isMeaningfulName(supabaseIdentity.name) &&
+    !namesMatch(supabaseIdentity.name, provided)
+  ) {
+    return { ok: false, reason: IDENTITY_MISMATCH_MESSAGE };
+  }
+
+  return { ok: true };
+}
+
 export async function getSessionUser(): Promise<SessionUser | null> {
   try {
     const jar = await cookies();

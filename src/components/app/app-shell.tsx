@@ -85,8 +85,8 @@ export function AppShell({
     if (next) playNotificationSound(user.role);
     push(
       next
-        ? "Notification sounds on."
-        : "Notification sounds muted. New updates still appear in your notifications.",
+        ? t("app.soundsOn")
+        : t("app.soundsMuted"),
       "info",
     );
   }
@@ -111,7 +111,7 @@ export function AppShell({
     ? [
         { href: "/dashboard", label: t("nav.home"), icon: Home },
         { href: "/bookings", label: t("nav.bookings"), icon: CalendarDays },
-        { href: "/owner/tractor", label: "Tractor", icon: Tractor },
+        { href: "/owner/tractor", label: t("nav.myTractor"), icon: Tractor },
         { href: "/profile", label: t("nav.profile"), icon: UserRound },
       ]
     : [
@@ -138,17 +138,22 @@ export function AppShell({
         body: JSON.stringify({ online: next }),
       });
       const body = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(body.error ?? "Could not update availability.");
+      if (!response.ok) throw new Error(body.error ?? t("app.couldNotUpdateAvailability"));
       setOnline(next);
       push(
         next
-          ? "You’re online for new booking requests."
-          : "You’re offline. Accepted and active work is unaffected.",
+          ? t("app.onlineNow")
+          : t("app.offlineNow"),
         next ? "success" : "info",
       );
       router.refresh();
     } catch (error) {
-      push(error instanceof Error ? error.message : "Could not update availability.", "error");
+      push(
+        error instanceof Error
+          ? error.message
+          : t("app.couldNotUpdateAvailability"),
+        "error",
+      );
     } finally {
       setStatusLoading(false);
     }
@@ -179,14 +184,14 @@ export function AppShell({
           </div>
           <div className="mt-3 flex items-center justify-between rounded-xl bg-cream/5 px-2.5 py-2">
             <span className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-cream/50">
-              {isOwner ? "Tractor owner" : "Farmer"}
+              {isOwner ? t("app.roleOwner") : t("app.roleFarmer")}
             </span>
             <span className="inline-flex items-center gap-1 text-[0.62rem] font-semibold text-wheat">
               {isOwner
                 ? online
-                  ? "Online"
-                  : "Offline"
-                : user.farmerProfile?.village || user.farmerProfile?.district || "Active"}
+                  ? t("common.online")
+                  : t("common.offline")
+                : user.farmerProfile?.village || user.farmerProfile?.district || t("common.active")}
             </span>
           </div>
         </div>
@@ -196,7 +201,7 @@ export function AppShell({
             type="button"
             role="switch"
             aria-checked={online}
-            aria-label="Online for new booking requests"
+            aria-label={t("app.onlineToggle")}
             onClick={toggleOnline}
             disabled={statusLoading}
             className="mt-3 flex items-center justify-between gap-2 rounded-2xl border border-cream/10 bg-cream/5 px-3.5 py-3 text-left transition hover:bg-cream/8 disabled:opacity-60"
@@ -204,7 +209,7 @@ export function AppShell({
             <span>
               <span className="flex items-center gap-1.5 text-xs font-semibold text-cream">
                 <Power className="size-3.5 text-wheat" />
-                {online ? t("app.ownerOnline") : "Offline for new requests"}
+                {online ? t("app.ownerOnline") : t("app.offlineForRequests")}
               </span>
               <span className="mt-0.5 block text-[0.62rem] leading-relaxed text-cream/45">
                 {t("app.ownerOfflineHint")}
@@ -249,7 +254,7 @@ export function AppShell({
 
           <div className="pt-3">
             <p className="px-3 pb-1.5 text-[0.58rem] font-bold uppercase tracking-[0.18em] text-cream/30">
-              More
+              {t("common.more")}
             </p>
             <Link
               href="/notifications"
@@ -285,7 +290,7 @@ export function AppShell({
               href="/"
               className="inline-flex items-center gap-1 text-[0.62rem] font-semibold text-cream/50 hover:text-cream"
             >
-              <MapPin className="size-3" /> Public site
+              <MapPin className="size-3" /> {t("common.publicSite")}
             </Link>
           </div>
           <button
@@ -306,7 +311,7 @@ export function AppShell({
             </div>
             <div className="hidden flex-col lg:flex">
               <p className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-stone/70">
-                {isOwner ? "Tractor owner workspace" : "Farmer workspace"}
+                {isOwner ? t("app.ownerWorkspace") : t("app.farmerWorkspace")}
               </p>
               <p className="mt-0.5 text-xs font-semibold text-forest">{dateLabel}</p>
             </div>
@@ -317,8 +322,8 @@ export function AppShell({
               <button
                 type="button"
                 onClick={toggleSound}
-                aria-label={soundOn ? "Mute notification sounds" : "Turn on notification sounds"}
-                title={soundOn ? "Notification sounds on" : "Notification sounds muted"}
+                aria-label={soundOn ? t("app.muteSounds") : t("app.unmuteSounds")}
+                title={soundOn ? t("app.soundsOnShort") : t("app.soundsMutedShort")}
                 className={cn(
                   "flex size-9 items-center justify-center rounded-full border transition",
                   soundOn
@@ -330,7 +335,7 @@ export function AppShell({
               </button>
               <Link
                 href="/notifications"
-                aria-label="Notifications"
+                aria-label={t("nav.notifications")}
                 className="relative flex size-9 items-center justify-center rounded-full border border-line bg-paper text-forest transition hover:border-forest/30"
               >
                 <Bell className="size-4" />
@@ -343,7 +348,7 @@ export function AppShell({
               <Link
                 href="/profile"
                 className="flex size-9 items-center justify-center rounded-full bg-forest text-xs font-bold text-cream lg:hidden"
-                aria-label="Profile"
+                aria-label={t("nav.profile")}
               >
                 {user.name
                   .split(" ")
@@ -356,10 +361,10 @@ export function AppShell({
                   type="button"
                   role="switch"
                   aria-checked={online}
-                  aria-label="Online for new booking requests"
+                  aria-label={t("app.onlineToggle")}
                   onClick={toggleOnline}
                   disabled={statusLoading}
-                  title={online ? "Online for new requests" : "Offline for new requests"}
+                  title={online ? t("app.onlineForRequests") : t("app.offlineForRequests")}
                   className={cn(
                     "flex items-center gap-2 rounded-full border px-2.5 py-1.5 text-[0.65rem] font-semibold transition disabled:opacity-60",
                     online
@@ -367,7 +372,7 @@ export function AppShell({
                       : "border-line bg-paper text-stone",
                   )}
                 >
-                  <span>{online ? "Online" : "Offline"}</span>
+                  <span>{online ? t("common.online") : t("common.offline")}</span>
                   <span
                     className={cn(
                       "relative h-5 w-9 rounded-full transition",
