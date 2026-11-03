@@ -15,9 +15,18 @@ function serviceRoleKey() {
   return process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || "";
 }
 
+/**
+ * Auth calls run on the server, so the service role key is a safe fallback when
+ * only the database credentials were added to the deployment. Prefer the anon
+ * key so the service role key stays out of any browser-facing client.
+ */
+function authKey() {
+  return anonKey() || serviceRoleKey();
+}
+
 /** True when Supabase Auth can send and verify phone OTPs. */
 export function isSupabaseAuthConfigured(): boolean {
-  return Boolean(supabaseUrl() && anonKey());
+  return Boolean(supabaseUrl() && authKey());
 }
 
 /** True when the server can read and write the Supabase Postgres state row. */
@@ -47,11 +56,11 @@ export function getSupabaseAdmin(): SupabaseClient {
 export function getSupabaseAuth(): SupabaseClient {
   if (!isSupabaseAuthConfigured()) {
     throw new Error(
-      "Supabase Auth is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      "Supabase Auth is not configured. Set NEXT_PUBLIC_SUPABASE_URL with NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY.",
     );
   }
   if (!authClient) {
-    authClient = createClient(supabaseUrl(), anonKey(), {
+    authClient = createClient(supabaseUrl(), authKey(), {
       auth: { persistSession: false, autoRefreshToken: false },
     });
   }
