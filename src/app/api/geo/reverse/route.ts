@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { googleMapsApiKey } from "@/lib/google-maps-key";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 type ReverseResult = {
   address: string;
@@ -32,6 +33,9 @@ type NominatimResponse = {
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const CACHE_LIMIT = 500;
 const cache = new Map<string, { expires: number; data: ReverseResult }>();
+// When Google rejects the server key (API not enabled, billing missing, bad
+// restriction) stop retrying it for a while and use OpenStreetMap directly.
+let googleDisabledUntil = 0;
 
 function cacheKey(lat: number, lng: number) {
   return `${lat.toFixed(5)},${lng.toFixed(5)}`;
@@ -81,6 +85,7 @@ async function reverseWithGoogle(
   lat: number,
   lng: number,
 ): Promise<ReverseResult | null> {
+  if (Date.now() < googleDisabledUntil) return null;
   const key = googleKey();
   if (!key) return null;
   try {
@@ -92,6 +97,13 @@ async function reverseWithGoogle(
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) return null;
     const data = (await response.json()) as GoogleGeocodeResponse;
+    if (data.status === "REQUEST_DENIED") {
+      googleDisabledUntil = Date.now() + 10 * 60 * 1000;
+      console.warn(
+        "[geo/reverse] Google geocoding rejected the key; using OpenStreetMap for 10 minutes.",
+      );
+      return null;
+    }
     const result = data.results?.[0];
     if (data.status !== "OK" || !result) return null;
 
@@ -190,6 +202,9 @@ async function reverseWithNominatim(
 }
 
 export async function GET(request: Request) {
+  const limited = enforceRateLimit(request, "geo-reverse", 60, 60 * 1000);
+  if (limited) return limited;
+
   const url = new URL(request.url);
   const lat = Number(url.searchParams.get("lat"));
   const lng = Number(url.searchParams.get("lng"));

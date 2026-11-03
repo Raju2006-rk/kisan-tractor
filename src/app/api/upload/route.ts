@@ -3,12 +3,57 @@ import { randomUUID } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fileOwnerMarker } from "@/lib/auth";
 import { handleApiError, jsonError, requireUser } from "@/lib/http";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { getSupabaseAdmin, isSupabaseDatabaseConfigured } from "@/lib/supabase";
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB for smartphone camera photos
 const PUBLIC_BUCKET = "app-files";
 const PRIVATE_BUCKET = "app-documents";
+
+type ImageKind = { mime: string; extension: string };
+
+const JPEG: ImageKind = { mime: "image/jpeg", extension: "jpg" };
+const PNG: ImageKind = { mime: "image/png", extension: "png" };
+const WEBP: ImageKind = { mime: "image/webp", extension: "webp" };
+const AVIF: ImageKind = { mime: "image/avif", extension: "avif" };
+
+const ALLOWED_MIME = new Set([JPEG.mime, PNG.mime, WEBP.mime, AVIF.mime]);
+
+/**
+ * Trust the file signature, not the browser-supplied MIME type. This rejects
+ * SVG/HTML masquerading as an image as well as truncated or empty files.
+ */
+function detectImage(bytes: Buffer): ImageKind | null {
+  if (bytes.length < 12) return null;
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return JPEG;
+  if (
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  ) {
+    return PNG;
+  }
+  if (
+    bytes.toString("ascii", 0, 4) === "RIFF" &&
+    bytes.toString("ascii", 8, 12) === "WEBP"
+  ) {
+    return WEBP;
+  }
+  if (
+    bytes.toString("ascii", 4, 8) === "ftyp" &&
+    ["avif", "avis"].includes(bytes.toString("ascii", 8, 12))
+  ) {
+    return AVIF;
+  }
+  return null;
+}
 
 async function ensureBucket(
   supabase: SupabaseClient,
@@ -42,7 +87,16 @@ async function ensureBucket(
 
 export async function POST(request: Request) {
   try {
-    await requireUser();
+    const user = await requireUser();
+    const limited = enforceRateLimit(
+      request,
+      "upload",
+      30,
+      60 * 60 * 1000,
+      user.id,
+    );
+    if (limited) return limited;
+
     let form: FormData;
     try {
       form = await request.formData();
@@ -53,25 +107,22 @@ export async function POST(request: Request) {
     if (!(file instanceof File)) {
       return jsonError("Please choose an image to upload.", 400);
     }
-    if (!file.type.startsWith("image/")) {
-      return jsonError("Please upload a valid image (JPG, PNG, WebP).", 400);
+    if (!ALLOWED_MIME.has(file.type)) {
+      return jsonError("Please upload a JPG, PNG, WebP or AVIF image.", 400);
+    }
+    if (file.size <= 0) {
+      return jsonError("The selected image is empty.", 400);
     }
     if (file.size > MAX_BYTES) {
       return jsonError("Images must be smaller than 10 MB.", 400);
     }
     const purpose = form.get("purpose") === "document" ? "document" : "photo";
-    const extension =
-      file.type === "image/png"
-        ? "png"
-        : file.type === "image/webp"
-          ? "webp"
-          : file.type === "image/avif"
-            ? "avif"
-            : file.type === "image/gif"
-              ? "gif"
-              : "jpg";
-    const fileName = `${randomUUID()}.${extension}`;
     const bytes = Buffer.from(await file.arrayBuffer());
+    const kind = detectImage(bytes);
+    if (!kind || kind.mime !== file.type) {
+      return jsonError("The file is not a valid JPG, PNG, WebP or AVIF image.", 400);
+    }
+    const fileName = `${fileOwnerMarker(user.id)}-${randomUUID()}.${kind.extension}`;
 
     if (isSupabaseDatabaseConfigured()) {
       try {
@@ -86,7 +137,7 @@ export async function POST(request: Request) {
           const { error } = await supabase.storage
             .from(bucket)
             .upload(fileName, bytes, {
-              contentType: file.type || "image/jpeg",
+              contentType: kind.mime,
               upsert: false,
             });
 
@@ -127,7 +178,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ url: `/uploads/${fileName}` });
     } catch {
       // In read-only serverless environments, fallback to a base64 data URL so uploads never fail
-      const base64 = `data:${file.type || "image/jpeg"};base64,${bytes.toString("base64")}`;
+      const base64 = `data:${kind.mime};base64,${bytes.toString("base64")}`;
       return NextResponse.json({ url: base64 });
     }
   } catch (error) {

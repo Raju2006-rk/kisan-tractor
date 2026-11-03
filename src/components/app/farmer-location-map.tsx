@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import type { Map as LeafletMap, Marker } from "leaflet";
 import {
-  hasGoogleMapsKey,
+  googleMapsProviderEnabled,
   loadGoogleMaps,
   onGoogleMapsAuthFailure,
   watchGoogleMapsError,
@@ -36,7 +36,7 @@ export default function FarmerLocationMap({
 }) {
   const [googleFailed, setGoogleFailed] = useState(false);
   const { t } = useI18n();
-  const useGoogle = hasGoogleMapsKey() && !googleFailed;
+  const useGoogle = googleMapsProviderEnabled() && !googleFailed;
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-line bg-sand">

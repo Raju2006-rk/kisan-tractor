@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import type { Map as LeafletMap } from "leaflet";
 import {
-  hasGoogleMapsKey,
+  googleMapsProviderEnabled,
   loadGoogleMaps,
   onGoogleMapsAuthFailure,
   watchGoogleMapsError,
@@ -44,7 +44,7 @@ export default function ExploreMap({
 }) {
   const { t } = useI18n();
   const [googleFailed, setGoogleFailed] = useState(false);
-  const useGoogle = hasGoogleMapsKey() && !googleFailed;
+  const useGoogle = googleMapsProviderEnabled() && !googleFailed;
 
   return (
     <div className="relative overflow-hidden rounded-[1.5rem] border border-line bg-sand shadow-[var(--shadow-card)]">

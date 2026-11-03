@@ -35,11 +35,17 @@ const DEVICE_TTL_MS = DEVICE_DAYS * 24 * 60 * 60 * 1000;
  * instances. SESSION_SECRET is required in production.
  */
 function sessionSecret(): string {
-  return (
-    process.env.SESSION_SECRET?.trim() ||
-    process.env.AUTH_SECRET?.trim() ||
-    "kisantractor-session-secret-fallback-token"
-  );
+  const secret =
+    process.env.SESSION_SECRET?.trim() || process.env.AUTH_SECRET?.trim();
+  if (secret) return secret;
+
+  // A hard-coded fallback would let anyone forge a session cookie in
+  // production, so the server refuses to issue or accept sessions without a
+  // real secret. Local development keeps a stable value for convenience.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET must be configured in production.");
+  }
+  return "kisantractor-local-development-session-secret";
 }
 
 type SessionTokenPayload = {
@@ -52,6 +58,19 @@ type SessionTokenPayload = {
 
 function signPayload(payload: string): string {
   return createHmac("sha256", sessionSecret()).update(payload).digest("base64url");
+}
+
+/**
+ * Stable, unguessable marker embedded in private upload names. It lets the
+ * uploader view a document immediately after upload, before the profile save
+ * references it, without granting access to other signed-in users.
+ */
+export function fileOwnerMarker(userId: string): string {
+  return signPayload(`file-owner:${userId}`).slice(0, 24);
+}
+
+export function isOwnedFileName(name: string, userId: string): boolean {
+  return name.startsWith(`${fileOwnerMarker(userId)}-`);
 }
 
 function encodeSessionToken(
@@ -159,7 +178,7 @@ function decodeDeviceToken(token: string): DeviceTokenPayload | null {
 }
 
 export function normalizeMobile(input: string): string {
-  const digits = input.replace(/\D/g, "");
+  const digits = String(input ?? "").replace(/\D/g, "");
   if (digits.length === 12 && digits.startsWith("91")) return digits.slice(2);
   if (digits.length === 11 && digits.startsWith("0")) return digits.slice(1);
   return digits;
@@ -295,17 +314,10 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
     const db = await getDb();
     const decoded = decodeSessionToken(token);
-    let userId = decoded?.userId ?? null;
+    if (!decoded) return null;
+    const userId = decoded.userId;
 
-    if (!userId) {
-      // Backwards compatibility for sessions created before signed cookies.
-      const session = db.sessions.find((s) => s.token === token);
-      if (!session) return null;
-      if (new Date(session.expiresAt).getTime() < Date.now()) return null;
-      userId = session.userId;
-    }
-
-    const dbUser = db.users.find((u) => u.id === userId) ?? decoded?.user;
+    const dbUser = db.users.find((u) => u.id === userId);
     if (!dbUser) return null;
 
     const dbFarmer = db.farmerProfiles.find((p) => p.userId === userId);
@@ -371,8 +383,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
     return {
       ...dbUser,
-      ...(decoded?.user ?? {}),
-      profilePhoto: dbUser.profilePhoto ?? decoded?.user?.profilePhoto ?? null,
+      profilePhoto: dbUser.profilePhoto ?? null,
       farmerProfile,
       ownerProfile,
     };
@@ -540,6 +551,9 @@ export async function verifyOtpChallenge(
   mobile: string,
   otp: string,
 ): Promise<{ ok: boolean; reason?: string }> {
+  if (!isDevOtpEnabled()) {
+    return { ok: false, reason: "That OTP is not valid. Please try again." };
+  }
   const db = await getDb();
   const challenge = db.otpChallenges
     .filter((item) => item.mobile === mobile)
@@ -548,9 +562,22 @@ export async function verifyOtpChallenge(
   if (new Date(challenge.expiresAt).getTime() < Date.now()) {
     return { ok: false, reason: "This OTP has expired. Request a new one." };
   }
-  if (challenge.otp !== otp) {
+
+  const provided = Buffer.from(otp);
+  const expected = Buffer.from(challenge.otp);
+  if (
+    provided.length !== expected.length ||
+    !timingSafeEqual(provided, expected)
+  ) {
     return { ok: false, reason: "That OTP does not match. Please try again." };
   }
+
+  // Consume the challenge so a captured OTP cannot be replayed.
+  await mutateDb((database) => {
+    database.otpChallenges = database.otpChallenges.filter(
+      (item) => item.id !== challenge.id,
+    );
+  });
   return { ok: true };
 }
 

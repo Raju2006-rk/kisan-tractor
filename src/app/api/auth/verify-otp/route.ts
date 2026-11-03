@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { handleApiError, jsonError, readJson } from "@/lib/http";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { isSupabaseAuthConfigured } from "@/lib/supabase";
 import type { Language, Role } from "@/lib/types";
 
@@ -24,7 +25,10 @@ export async function POST(request: Request) {
       language?: Language;
     }>(request);
     const mobile = normalizeMobile(body.mobile ?? "");
-    const otp = (body.otp ?? "").replace(/\D/g, "");
+    const otp =
+      typeof body.otp === "string" ? body.otp.replace(/\D/g, "").slice(0, 6) : "";
+    const providedName =
+      typeof body.name === "string" ? body.name.trim().slice(0, 80) : "";
     if (!isValidMobile(mobile)) {
       return jsonError("Please enter a valid 10-digit mobile number.", 400);
     }
@@ -32,10 +36,24 @@ export async function POST(request: Request) {
       return jsonError("Enter the 6-digit sign-in OTP.", 400);
     }
 
+    // Bound OTP guessing per IP and per phone number.
+    const ipLimited = enforceRateLimit(request, "otp-verify-ip", 20, 10 * 60 * 1000);
+    if (ipLimited) return ipLimited;
+    const mobileLimited = enforceRateLimit(
+      request,
+      "otp-verify-mobile",
+      8,
+      10 * 60 * 1000,
+      mobile,
+    );
+    if (mobileLimited) return mobileLimited;
+
     let supabaseUserId: string | undefined;
     if (isSupabaseAuthConfigured()) {
       const verified = await verifySupabaseOtp(mobile, otp);
       if ("error" in verified) {
+        // Development challenges only exist outside production. Do not let a
+        // stale local challenge become a production login path.
         const fallback = await verifyOtpChallenge(mobile, otp);
         if (!fallback.ok) {
           return jsonError(verified.error, 400);
@@ -53,11 +71,11 @@ export async function POST(request: Request) {
     const db = await getDb();
     const existing = db.users.find((u) => u.mobile === mobile);
 
-    const identity = await validateStoredIdentity(mobile, body.name);
+    const identity = await validateStoredIdentity(mobile, providedName);
     if (!identity.ok) {
       return NextResponse.json(
         { error: identity.reason, code: "identity_mismatch" },
-        { status: 400 },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
       );
     }
 
@@ -65,7 +83,7 @@ export async function POST(request: Request) {
     const { user, isNew } = await findOrCreateUser({
       id: supabaseUserId,
       mobile,
-      name: body.name,
+      name: providedName || undefined,
       role,
       language: body.language ?? "en",
     });

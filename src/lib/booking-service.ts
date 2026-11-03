@@ -416,10 +416,42 @@ export function listTractors(
         .toLowerCase();
       if (!haystack.includes(query.toLowerCase())) continue;
     }
+    // Public listings never need the owner's phone number or payment details.
+    // Mask them so the catalog endpoint cannot leak private account data.
+    const publicView = !ownerId;
     rows.push({
       ...tractor,
-      owner: { id: owner.id, name: owner.name, mobile: owner.mobile },
-      ownerProfile,
+      owner: {
+        id: owner.id,
+        name: owner.name,
+        mobile: publicView ? "" : owner.mobile,
+      },
+      ownerProfile: publicView
+        ? {
+            userId: ownerProfile.userId,
+            address: "",
+            village: ownerProfile.village,
+            district: ownerProfile.district,
+            state: ownerProfile.state,
+            pincode: "",
+            lat: 0,
+            lng: 0,
+            online: ownerProfile.online,
+            serviceRadiusKm: ownerProfile.serviceRadiusKm,
+            documents: undefined,
+            payment: {
+              shareUpi: false,
+              upiId: "",
+              shareQr: false,
+              qrImage: "",
+              shareBank: false,
+              bankAccountName: "",
+              bankAccountNumber: "",
+              bankIfsc: "",
+              preferredMethod: "cash",
+            },
+          }
+        : ownerProfile,
       pricing,
       equipment,
       distanceKm,
@@ -583,6 +615,15 @@ export async function createBooking(
   if (!SERVICES.some((service) => service.id === input.serviceType)) {
     throw new ServiceError("Please choose a valid service.", 400);
   }
+  if (!["hourly", "acre", "trip"].includes(input.pricingType)) {
+    throw new ServiceError("Please choose a valid pricing option.", 400);
+  }
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(input.bookingDate) ||
+    Number.isNaN(new Date(`${input.bookingDate}T00:00:00`).getTime())
+  ) {
+    throw new ServiceError("Please choose a valid booking date.", 400);
+  }
   if (!input.bookingDate || input.bookingDate < todayISO()) {
     throw new ServiceError("Please choose today or a future date.", 400);
   }
@@ -600,15 +641,15 @@ export async function createBooking(
     }
   }
   if (input.bookingFor === "other") {
-    const recipientMobile = (input.recipientMobile ?? "").replace(/\D/g, "");
-    if (!input.recipientName?.trim()) {
+    const recipientMobile = safeText(input.recipientMobile, 20).replace(/\D/g, "");
+    if (!safeText(input.recipientName, 80)) {
       throw new ServiceError("Please enter the recipient's name.", 400);
     }
     if (!/^[6-9]\d{9}$/.test(recipientMobile)) {
       throw new ServiceError("Please enter a valid 10-digit recipient mobile number.", 400);
     }
   }
-  if (!input.serviceLocation?.label?.trim() || !input.serviceLocation?.village?.trim()) {
+  if (!input.serviceLocation || !safeText(input.serviceLocation.label, 200) || !safeText(input.serviceLocation.village, 80)) {
     throw new ServiceError("Please add the service location.", 400);
   }
   if (
@@ -685,14 +726,19 @@ export async function createBooking(
       tractorId: tractor.id,
       bookingFor: input.bookingFor,
       recipientName:
-        input.bookingFor === "other" ? input.recipientName?.trim() ?? null : null,
+        input.bookingFor === "other" ? safeText(input.recipientName, 80) : null,
       recipientMobile:
         input.bookingFor === "other"
-          ? (input.recipientMobile ?? "").replace(/\D/g, "")
+          ? safeText(input.recipientMobile, 20).replace(/\D/g, "")
           : null,
       serviceLocation: {
-        ...input.serviceLocation,
-        note: input.serviceLocation.note?.slice(0, 300) ?? "",
+        label: safeText(input.serviceLocation.label, 200),
+        village: safeText(input.serviceLocation.village, 80),
+        district: safeText(input.serviceLocation.district, 80),
+        state: safeText(input.serviceLocation.state, 80),
+        lat: input.serviceLocation.lat,
+        lng: input.serviceLocation.lng,
+        note: safeText(input.serviceLocation.note, 300),
       },
       serviceType: input.serviceType,
       pricingType: input.pricingType,
@@ -705,7 +751,7 @@ export async function createBooking(
       estimatedAmount,
       finalAmount: null,
       status: "PENDING",
-      note: input.note?.slice(0, 500) ?? "",
+      note: safeText(input.note, 500),
       createdAt: now,
       updatedAt: now,
       cancelledAt: null,
@@ -880,7 +926,7 @@ export async function performBookingAction(input: {
       }
       case "reject": {
         if (role !== "owner") throw new ServiceError("Only the owner can reject.", 403);
-        const reason = payload?.reason?.trim() || "Owner unavailable for this booking";
+        const reason = safeText(payload?.reason, 200) || "Owner unavailable for this booking";
         changeStatus(
           draft,
           booking,
@@ -905,7 +951,7 @@ export async function performBookingAction(input: {
         }
         const newStatus: BookingStatus =
           role === "farmer" ? "CANCELLED_BY_FARMER" : "CANCELLED_BY_OWNER";
-        const reason = payload?.reason?.trim() || "Cancelled by user";
+        const reason = safeText(payload?.reason, 200) || "Cancelled by user";
         booking.cancelledAt = nowIso;
         booking.cancellationReason = reason;
         booking.cancelledBy = user.id;
@@ -961,7 +1007,7 @@ export async function performBookingAction(input: {
           "PAUSED",
           user.id,
           "owner",
-          payload?.reason?.trim() || "Work paused",
+          safeText(payload?.reason, 200) || "Work paused",
         );
         notify(
           draft,
@@ -1098,7 +1144,9 @@ export async function performBookingAction(input: {
           (p) => p.bookingId === booking.id && p.paymentStatus !== "confirmed",
         );
         const method: PaymentMethod =
-          payload?.method ?? existingPayment?.paymentMethod ?? ownerProfile.payment.preferredMethod;
+          payload?.method && ["upi", "cash", "bank", "other"].includes(payload.method)
+            ? payload.method
+            : existingPayment?.paymentMethod ?? ownerProfile.payment.preferredMethod;
         if (existingPayment) {
           existingPayment.paymentStatus = "confirmed";
           existingPayment.confirmedBy = user.id;
@@ -1116,7 +1164,7 @@ export async function performBookingAction(input: {
             paidAt: nowIso,
             confirmedBy: user.id,
             confirmedAt: nowIso,
-            notes: payload?.notes?.slice(0, 300) ?? "Owner marked payment done after receiving the money.",
+            notes: safeText(payload?.notes, 300) || "Owner marked payment done after receiving the money.",
           });
         }
         changeStatus(
@@ -1216,8 +1264,8 @@ export async function performBookingAction(input: {
             throw new ServiceError("The support window for this completed booking has passed.", 409);
           }
         }
-        const reason = payload?.reason?.trim();
-        const details = payload?.details?.trim();
+        const reason = safeText(payload?.reason, 120);
+        const details = safeText(payload?.details, 1000);
         if (!reason || !details) {
           throw new ServiceError("Please add a reason and details for the issue.", 400);
         }
@@ -1427,17 +1475,22 @@ export async function updateOwnerPaymentDetails(
     preferredMethod: PaymentMethod;
   },
 ): Promise<OwnerProfile> {
-  if (input.shareUpi && !/^[\w.\-]{2,}@[a-zA-Z]{2,}$/.test(input.upiId.trim())) {
+  const upiId = safeText(input.upiId, 120);
+  const bankAccountName = safeText(input.bankAccountName, 120);
+  const bankAccountNumber = safeText(input.bankAccountNumber, 30).replace(/\s/g, "");
+  const bankIfsc = safeText(input.bankIfsc, 20).toUpperCase();
+  const qrImage = cleanImageValue(input.qrImage, "UPI QR");
+  if (input.shareUpi && !/^[\w.\-]{2,}@[a-zA-Z]{2,}$/.test(upiId)) {
     throw new ServiceError("Please enter a valid UPI ID, for example owner@upi.", 400);
   }
   if (input.shareBank) {
-    if (!input.bankAccountName.trim()) {
+    if (!bankAccountName) {
       throw new ServiceError("Please add the bank account holder name.", 400);
     }
-    if (!/^\d{9,18}$/.test(input.bankAccountNumber.replace(/\s/g, ""))) {
+    if (!/^\d{9,18}$/.test(bankAccountNumber)) {
       throw new ServiceError("Please enter a valid bank account number.", 400);
     }
-    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(input.bankIfsc.trim().toUpperCase())) {
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bankIfsc)) {
       throw new ServiceError("Please enter a valid IFSC code.", 400);
     }
   }
@@ -1445,15 +1498,13 @@ export async function updateOwnerPaymentDetails(
     const profile = ensureOwnerProfile(db, userId);
     profile.payment = {
       shareUpi: Boolean(input.shareUpi),
-      upiId: input.shareUpi ? input.upiId.trim() : "",
+      upiId: input.shareUpi ? upiId : "",
       shareQr: Boolean(input.shareQr),
-      qrImage: input.shareQr ? input.qrImage : "",
+      qrImage: input.shareQr ? qrImage : "",
       shareBank: Boolean(input.shareBank),
-      bankAccountName: input.bankAccountName.trim(),
-      bankAccountNumber: input.shareBank
-        ? input.bankAccountNumber.replace(/\s/g, "")
-        : "",
-      bankIfsc: input.shareBank ? input.bankIfsc.trim().toUpperCase() : "",
+      bankAccountName,
+      bankAccountNumber: input.shareBank ? bankAccountNumber : "",
+      bankIfsc: input.shareBank ? bankIfsc : "",
       preferredMethod: input.preferredMethod,
     };
     return profile;
@@ -1484,10 +1535,11 @@ export async function updateUserProfile(
     const user = db.users.find((u) => u.id === userId);
     if (!user) throw new ServiceError("User not found.", 404);
     if (input.name !== undefined) {
-      if (!input.name.trim() || input.name.trim().length < 2) {
+      const name = safeText(input.name, 80);
+      if (!name || name.length < 2) {
         throw new ServiceError("Please enter a valid name.", 400);
       }
-      user.name = input.name.trim().slice(0, 80);
+      user.name = name;
     }
     if (input.preferredLanguage) {
       if (!LANGUAGES.some((item) => item.code === input.preferredLanguage)) {
@@ -1503,16 +1555,22 @@ export async function updateUserProfile(
         : (farmerProfile ?? ensureFarmerProfile(db, userId));
     if (profile) {
       if (input.village !== undefined) {
-        const village = input.village.trim().slice(0, 80);
+        const village = safeText(input.village, 80);
         if (!village) {
           throw new ServiceError("Please enter your village name.", 400);
         }
         profile.village = village;
       }
-      if (input.address !== undefined) profile.address = input.address.trim();
-      if (input.pincode !== undefined) profile.pincode = input.pincode.trim();
-      if (input.district !== undefined) profile.district = input.district.trim();
-      if (input.state !== undefined) profile.state = input.state.trim();
+      if (input.address !== undefined) profile.address = safeText(input.address, 300);
+      if (input.pincode !== undefined) {
+        const pincode = safeText(input.pincode, 10);
+        if (pincode && !/^\d{5,6}$/.test(pincode)) {
+          throw new ServiceError("Please enter a valid pincode.", 400);
+        }
+        profile.pincode = pincode;
+      }
+      if (input.district !== undefined) profile.district = safeText(input.district, 80);
+      if (input.state !== undefined) profile.state = safeText(input.state, 80);
       if (input.lat !== undefined) {
         if (!Number.isFinite(input.lat) || input.lat < -90 || input.lat > 90) {
           throw new ServiceError("Please provide a valid latitude.", 400);
@@ -1534,7 +1592,7 @@ export async function updateUserProfile(
           rcStatus: "not_provided",
         };
         const cleanUpload = (value: string | null | undefined, label: string) => {
-          const trimmed = (value ?? "").trim();
+          const trimmed = typeof value === "string" ? value.trim() : "";
           if (!trimmed) return "";
           const isPrivateFile =
             /^\/api\/files\/app-documents\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(
@@ -1561,7 +1619,7 @@ export async function updateUserProfile(
           docs.rcPhoto = photo || undefined;
         }
         if (input.documents.rcNumber !== undefined) {
-          const rcNumber = (input.documents.rcNumber ?? "").trim().toUpperCase();
+          const rcNumber = safeText(input.documents.rcNumber, 20).toUpperCase();
           if (
             rcNumber &&
             !/^[A-Z]{2}\s?\d{1,2}\s?[A-Z]{1,3}\s?\d{3,4}$/i.test(rcNumber)
@@ -1595,6 +1653,40 @@ export async function updateUserProfile(
   };
 }
 
+function safeText(value: unknown, maxLength = 200): string {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function isSafeImageValue(value: string): boolean {
+  if (!value || value.length > 14 * 1024 * 1024) return false;
+  if (/^\/uploads\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)) return true;
+  if (/^\/api\/files\/app-documents\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)) {
+    return true;
+  }
+  if (/^data:image\/(jpeg|png|webp|avif);base64,[A-Za-z0-9+/=]+$/i.test(value)) {
+    return true;
+  }
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === "https:" || url.protocol === "http:") &&
+      !url.username &&
+      !url.password
+    );
+  } catch {
+    return false;
+  }
+}
+
+function cleanImageValue(value: unknown, label: string): string {
+  if (typeof value !== "string" || !value.trim()) return "";
+  const trimmed = value.trim();
+  if (!isSafeImageValue(trimmed)) {
+    throw new ServiceError(`Please upload a valid ${label} image.`, 400);
+  }
+  return trimmed;
+}
+
 export async function saveTractor(
   userId: string,
   input: {
@@ -1622,10 +1714,13 @@ export async function saveTractor(
     tripRate: number;
   },
 ): Promise<Tractor> {
-  if (!input.brand.trim() || !input.model.trim()) {
+  const brand = safeText(input.brand, 60);
+  const model = safeText(input.model, 60);
+  const registrationNumber = safeText(input.registrationNumber, 20).toUpperCase();
+  if (!brand || !model) {
     throw new ServiceError("Please add the tractor brand and model.", 400);
   }
-  if (!/^[A-Z]{2}\s?\d{1,2}\s?[A-Z]{1,3}\s?\d{3,4}$/i.test(input.registrationNumber.trim())) {
+  if (!/^[A-Z]{2}\s?\d{1,2}\s?[A-Z]{1,3}\s?\d{3,4}$/.test(registrationNumber)) {
     throw new ServiceError("Please enter a valid registration number, for example MH 15 GT 4821.", 400);
   }
   if (!input.hourlyEnabled && !input.acreEnabled && !input.tripEnabled) {
@@ -1647,11 +1742,57 @@ export async function saveTractor(
   if (input.tripEnabled && (!Number.isFinite(input.tripRate) || input.tripRate < 1)) {
     throw new ServiceError("Please add a per-trip rate.", 400);
   }
-  if (!input.equipmentIds.length) {
+  if (!Array.isArray(input.equipmentIds) || !input.equipmentIds.length) {
     throw new ServiceError("Please select at least one equipment.", 400);
   }
+  const image = cleanImageValue(input.image, "tractor");
+  const images = Array.isArray(input.images)
+    ? input.images
+        .slice(0, 8)
+        .map((value) => cleanImageValue(value, "tractor"))
+        .filter(Boolean)
+    : [];
+  const horsepower = Number(input.horsepower);
+  if (!Number.isFinite(horsepower) || horsepower < 1 || horsepower > 1000) {
+    throw new ServiceError("Please enter a valid horsepower.", 400);
+  }
+  const manufacturingYear = Number(input.manufacturingYear);
+  const maxYear = new Date().getFullYear() + 1;
+  if (
+    !Number.isFinite(manufacturingYear) ||
+    manufacturingYear < 1950 ||
+    manufacturingYear > maxYear
+  ) {
+    throw new ServiceError("Please enter a valid manufacturing year.", 400);
+  }
+  if (
+    !Number.isFinite(input.lat) ||
+    input.lat < -90 ||
+    input.lat > 90 ||
+    !Number.isFinite(input.lng) ||
+    input.lng < -180 ||
+    input.lng > 180
+  ) {
+    throw new ServiceError("Please choose a valid tractor location.", 400);
+  }
+  if (
+    !Number.isFinite(input.serviceRadiusKm) ||
+    input.serviceRadiusKm < 1 ||
+    input.serviceRadiusKm > 50
+  ) {
+    throw new ServiceError("Service radius must be between 1 and 50 km.", 400);
+  }
+  const status = input.status === "maintenance" || input.status === "inactive"
+    ? input.status
+    : "active";
   return mutateDb((db) => {
     const ownerProfile = ensureOwnerProfile(db, userId);
+    const validEquipment = input.equipmentIds.filter((id) =>
+      db.equipment.some((equipment) => equipment.id === id),
+    );
+    if (!validEquipment.length) {
+      throw new ServiceError("Please select at least one valid equipment.", 400);
+    }
     let tractor: Tractor;
     if (input.id) {
       const found = db.tractors.find(
@@ -1682,25 +1823,25 @@ export async function saveTractor(
       };
       db.tractors.push(tractor);
     }
-    tractor.brand = input.brand.trim();
-    tractor.model = input.model.trim();
-    tractor.registrationNumber = input.registrationNumber.trim().toUpperCase();
-    tractor.horsepower = Number(input.horsepower) || 50;
-    tractor.manufacturingYear = Number(input.manufacturingYear) || new Date().getFullYear();
-    tractor.image = input.image || tractor.image || PHOTOS.tractorIndia;
-    tractor.images = input.images?.length ? input.images : [tractor.image];
-    tractor.status = input.status ?? "active";
-    const tractorVillage = (input.village ?? "").trim() || (ownerProfile.village ?? "").trim();
+    tractor.brand = brand;
+    tractor.model = model;
+    tractor.registrationNumber = registrationNumber;
+    tractor.horsepower = horsepower;
+    tractor.manufacturingYear = manufacturingYear;
+    tractor.image = image || tractor.image || PHOTOS.tractorIndia;
+    tractor.images = images.length ? images : [tractor.image];
+    tractor.status = status;
+    const tractorVillage = safeText(input.village, 80) || (ownerProfile.village ?? "").trim();
     if (!tractorVillage) {
       throw new ServiceError("Please enter the tractor's village.", 400);
     }
     tractor.village = tractorVillage;
-    tractor.district = input.district || ownerProfile.district;
-    tractor.state = input.state || ownerProfile.state;
-    tractor.lat = Number.isFinite(input.lat) ? input.lat : ownerProfile.lat;
-    tractor.lng = Number.isFinite(input.lng) ? input.lng : ownerProfile.lng;
-    tractor.serviceRadiusKm = input.serviceRadiusKm || 10;
-    tractor.equipmentIds = input.equipmentIds;
+    tractor.district = (safeText(input.district, 80) || ownerProfile.district).slice(0, 80);
+    tractor.state = (safeText(input.state, 80) || ownerProfile.state).slice(0, 80);
+    tractor.lat = input.lat;
+    tractor.lng = input.lng;
+    tractor.serviceRadiusKm = input.serviceRadiusKm;
+    tractor.equipmentIds = validEquipment;
     const existingPricing = db.pricing.find((p) => p.tractorId === tractor.id);
     const pricing = existingPricing ?? {
       tractorId: tractor.id,

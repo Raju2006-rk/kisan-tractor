@@ -1,6 +1,9 @@
-import { googleMapsApiKey } from "@/lib/google-maps-key";
+import {
+  googleMapsApiKey,
+  googleMapsProviderEnabled,
+} from "@/lib/google-maps-key";
 
-export { googleMapsApiKey };
+export { googleMapsApiKey, googleMapsProviderEnabled };
 
 export type GoogleLatLng = { lat: number; lng: number };
 
@@ -119,10 +122,6 @@ export function watchGoogleMapsError(
   return stop;
 }
 
-export function hasGoogleMapsKey(): boolean {
-  return googleMapsApiKey().length > 0;
-}
-
 /**
  * Load the Google Maps JavaScript API once per page. Components fall back to
  * the OpenStreetMap/Leaflet renderer when no key is configured or the script
@@ -134,6 +133,9 @@ export function loadGoogleMaps(): Promise<GoogleMapsApi> {
   }
   if (authFailed) {
     return Promise.reject(new Error("Google Maps authentication failed."));
+  }
+  if (!googleMapsProviderEnabled()) {
+    return Promise.reject(new Error("Google Maps is not enabled."));
   }
   if (window.google?.maps) return Promise.resolve(window.google);
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { refreshSession } from "@/lib/auth";
 import { updateOwnerPaymentDetails } from "@/lib/booking-service";
-import { handleApiError, jsonError, readJson, requireUser } from "@/lib/http";
+import { handleApiError, cleanText, jsonError, readJson, requireUser } from "@/lib/http";
 import type { PaymentMethod } from "@/lib/types";
 
 export async function PATCH(request: Request) {
@@ -27,13 +27,13 @@ export async function PATCH(request: Request) {
     }
     const profile = await updateOwnerPaymentDetails(user.id, {
       shareUpi: Boolean(body.shareUpi),
-      upiId: body.upiId ?? "",
+      upiId: cleanText(body.upiId, 120),
       shareQr: Boolean(body.shareQr),
-      qrImage: body.qrImage ?? "",
+      qrImage: cleanText(body.qrImage, 14 * 1024 * 1024),
       shareBank: Boolean(body.shareBank),
-      bankAccountName: body.bankAccountName ?? "",
-      bankAccountNumber: body.bankAccountNumber ?? "",
-      bankIfsc: body.bankIfsc ?? "",
+      bankAccountName: cleanText(body.bankAccountName, 120),
+      bankAccountNumber: cleanText(body.bankAccountNumber, 30),
+      bankIfsc: cleanText(body.bankIfsc, 20),
       preferredMethod: method,
     });
     await refreshSession(user.id);

@@ -21,10 +21,13 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const user = await requireUser();
-    const body = await readJson<{ ids?: string[] }>(request).catch(
-      () => ({}) as { ids?: string[] },
+    const body = await readJson<{ ids?: unknown }>(request).catch(
+      () => ({}) as { ids?: unknown },
     );
-    await markNotificationsRead(user.id, body.ids);
+    const ids = Array.isArray(body.ids)
+      ? body.ids.filter((id): id is string => typeof id === "string").slice(0, 200)
+      : undefined;
+    await markNotificationsRead(user.id, ids);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return handleApiError(error);
