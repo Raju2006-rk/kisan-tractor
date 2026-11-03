@@ -34,6 +34,7 @@ export function Photo({
   const isInline = Boolean(
     src && (src.startsWith("data:") || src.startsWith("blob:")),
   );
+  const isPrivateFile = Boolean(src?.startsWith("/api/files/"));
   const valid = Boolean(src) && !failed;
 
   return (
@@ -44,7 +45,7 @@ export function Photo({
           alt={alt}
           fill
           sizes={sizes}
-          unoptimized={isInline}
+          unoptimized={isInline || isPrivateFile}
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : "auto"}
           onError={() => setFailed(true)}

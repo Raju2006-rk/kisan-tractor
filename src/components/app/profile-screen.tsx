@@ -217,6 +217,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
     try {
       const body = new FormData();
       body.append("file", file);
+      body.append("purpose", "document");
       const response = await fetch("/api/upload", { method: "POST", body });
       const result = (await response.json()) as { url?: string; error?: string };
       if (!response.ok || !result.url) {

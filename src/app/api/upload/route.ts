@@ -2,10 +2,43 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { handleApiError, jsonError, requireUser } from "@/lib/http";
 import { getSupabaseAdmin, isSupabaseDatabaseConfigured } from "@/lib/supabase";
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB for smartphone camera photos
+const PUBLIC_BUCKET = "app-files";
+const PRIVATE_BUCKET = "app-documents";
+
+async function ensureBucket(
+  supabase: SupabaseClient,
+  name: string,
+  isPublic: boolean,
+): Promise<boolean> {
+  const { data: existing, error } = await supabase.storage.getBucket(name);
+  if (!error && existing) {
+    if (Boolean(existing.public) === isPublic) return true;
+    const { error: updateError } = await supabase.storage.updateBucket(name, {
+      public: isPublic,
+      fileSizeLimit: MAX_BYTES,
+    });
+    if (updateError) {
+      console.warn(`Could not update storage bucket '${name}':`, updateError.message);
+      return false;
+    }
+    return true;
+  }
+
+  const { error: createError } = await supabase.storage.createBucket(name, {
+    public: isPublic,
+    fileSizeLimit: MAX_BYTES,
+  });
+  if (createError) {
+    console.warn(`Could not create storage bucket '${name}':`, createError.message);
+    return false;
+  }
+  return true;
+}
 
 export async function POST(request: Request) {
   try {
@@ -26,6 +59,7 @@ export async function POST(request: Request) {
     if (file.size > MAX_BYTES) {
       return jsonError("Images must be smaller than 10 MB.", 400);
     }
+    const purpose = form.get("purpose") === "document" ? "document" : "photo";
     const extension =
       file.type === "image/png"
         ? "png"
@@ -39,56 +73,53 @@ export async function POST(request: Request) {
     const fileName = `${randomUUID()}.${extension}`;
     const bytes = Buffer.from(await file.arrayBuffer());
 
-    // 1. Try uploading to Supabase Storage 'app-files' bucket first
     if (isSupabaseDatabaseConfigured()) {
       try {
         const supabase = getSupabaseAdmin();
-        let uploadRes = await supabase.storage
-          .from("app-files")
-          .upload(fileName, bytes, {
-            contentType: file.type || "image/jpeg",
-            upsert: true,
-          });
-
-        // If bucket is missing, create it automatically and retry
-        if (
-          uploadRes.error &&
-          (uploadRes.error.message?.toLowerCase().includes("not found") ||
-            (uploadRes.error as { statusCode?: number | string }).statusCode === 404 ||
-            (uploadRes.error as { statusCode?: number | string }).statusCode === "404")
-        ) {
-          try {
-            await supabase.storage.createBucket("app-files", {
-              public: true,
-              fileSizeLimit: 10485760,
+        const bucket = purpose === "document" ? PRIVATE_BUCKET : PUBLIC_BUCKET;
+        const bucketReady = await ensureBucket(
+          supabase,
+          bucket,
+          purpose !== "document",
+        );
+        if (bucketReady) {
+          const { error } = await supabase.storage
+            .from(bucket)
+            .upload(fileName, bytes, {
+              contentType: file.type || "image/jpeg",
+              upsert: false,
             });
-            uploadRes = await supabase.storage
-              .from("app-files")
-              .upload(fileName, bytes, {
-                contentType: file.type || "image/jpeg",
-                upsert: true,
-              });
-          } catch (createErr) {
-            console.warn("Could not auto-create app-files bucket:", createErr);
-          }
-        }
 
-        if (!uploadRes.error && uploadRes.data) {
-          const { data: publicData } = supabase.storage
-            .from("app-files")
-            .getPublicUrl(fileName);
-          if (publicData?.publicUrl) {
-            return NextResponse.json({ url: publicData.publicUrl });
+          if (!error) {
+            if (purpose === "document") {
+              // Documents are private. They are streamed through an authenticated route.
+              return NextResponse.json({
+                url: `/api/files/${PRIVATE_BUCKET}/${fileName}`,
+              });
+            }
+            const { data: publicData } = supabase.storage
+              .from(bucket)
+              .getPublicUrl(fileName);
+            if (publicData?.publicUrl) {
+              return NextResponse.json({ url: publicData.publicUrl });
+            }
+          } else {
+            console.warn("Supabase storage error:", error.message);
           }
-        } else if (uploadRes.error) {
-          console.warn("Supabase storage error:", uploadRes.error.message);
         }
       } catch (storageErr) {
-        console.warn("Supabase storage upload fallback to local:", storageErr);
+        console.warn("Supabase storage upload failed:", storageErr);
       }
     }
 
-    // 2. Fallback to local uploads directory or base64 data URL
+    if (purpose === "document") {
+      return jsonError(
+        "Document uploads are temporarily unavailable. Please try again later.",
+        503,
+      );
+    }
+
+    // Photos fall back to the local uploads directory or a base64 data URL.
     try {
       const uploadDir = path.join(process.cwd(), "public", "uploads");
       await fs.mkdir(uploadDir, { recursive: true });

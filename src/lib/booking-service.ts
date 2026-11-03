@@ -1536,12 +1536,17 @@ export async function updateUserProfile(
         const cleanUpload = (value: string | null | undefined, label: string) => {
           const trimmed = (value ?? "").trim();
           if (!trimmed) return "";
-          if (
-            !trimmed.startsWith("/uploads/") &&
-            !trimmed.startsWith("http://") &&
-            !trimmed.startsWith("https://") &&
-            !trimmed.startsWith("data:image/")
-          ) {
+          const isPrivateFile =
+            /^\/api\/files\/app-documents\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(
+              trimmed,
+            );
+          const isPublicFile =
+            !trimmed.startsWith("/api/files/") &&
+            (trimmed.startsWith("/uploads/") ||
+              trimmed.startsWith("http://") ||
+              trimmed.startsWith("https://") ||
+              trimmed.startsWith("data:image/"));
+          if (!isPrivateFile && !isPublicFile) {
             throw new ServiceError(`Please upload a valid ${label} image.`, 400);
           }
           return trimmed;
