@@ -1,3 +1,7 @@
+import { googleMapsApiKey } from "@/lib/google-maps-key";
+
+export { googleMapsApiKey };
+
 export type GoogleLatLng = { lat: number; lng: number };
 
 export type GoogleMap = {
@@ -42,16 +46,77 @@ export type GoogleMapsApi = {
 declare global {
   interface Window {
     google?: GoogleMapsApi;
+    gm_authFailure?: () => void;
   }
 }
 
 const SCRIPT_ATTR = "data-kisantractor-google-maps";
 
 let loaderPromise: Promise<GoogleMapsApi> | null = null;
+let authFailed = false;
+const authFailureListeners = new Set<() => void>();
 
-/** Browser key. The same key can be restricted by HTTP referrer in Google Cloud. */
-export function googleMapsApiKey(): string {
-  return (process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "").trim();
+function handleAuthFailure() {
+  authFailed = true;
+  loaderPromise = null;
+  for (const listener of authFailureListeners) listener();
+}
+
+/**
+ * Google calls window.gm_authFailure when the browser key is rejected (for
+ * example an API restriction or a missing Maps JavaScript API enablement).
+ * Components subscribe so they can switch to the OpenStreetMap renderer.
+ */
+export function onGoogleMapsAuthFailure(listener: () => void): () => void {
+  authFailureListeners.add(listener);
+  if (authFailed) listener();
+  return () => {
+    authFailureListeners.delete(listener);
+  };
+}
+
+const BLOCKED_MAP_PATTERN =
+  /can't load Google Maps correctly|didn't load Google Maps correctly/i;
+
+/**
+ * Google draws its "This page can't load Google Maps correctly" overlay for
+ * rejected keys instead of rejecting the loader. Watch the map container
+ * briefly so the caller can switch to the OpenStreetMap renderer.
+ */
+export function watchGoogleMapsError(
+  element: HTMLElement,
+  listener: () => void,
+): () => void {
+  if (typeof document === "undefined") return () => {};
+  let scheduled = false;
+  let stopped = false;
+
+  const stop = () => {
+    stopped = true;
+    observer.disconnect();
+  };
+  const check = () => {
+    if (stopped) return;
+    if (BLOCKED_MAP_PATTERN.test(element.textContent ?? "")) {
+      stop();
+      listener();
+    }
+  };
+  const observer = new MutationObserver(() => {
+    if (scheduled || stopped) return;
+    scheduled = true;
+    window.requestAnimationFrame(() => {
+      scheduled = false;
+      check();
+    });
+  });
+  observer.observe(element, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  });
+  check();
+  return stop;
 }
 
 export function hasGoogleMapsKey(): boolean {
@@ -67,6 +132,9 @@ export function loadGoogleMaps(): Promise<GoogleMapsApi> {
   if (typeof window === "undefined") {
     return Promise.reject(new Error("Google Maps can only load in the browser."));
   }
+  if (authFailed) {
+    return Promise.reject(new Error("Google Maps authentication failed."));
+  }
   if (window.google?.maps) return Promise.resolve(window.google);
 
   const key = googleMapsApiKey();
@@ -75,6 +143,8 @@ export function loadGoogleMaps(): Promise<GoogleMapsApi> {
   }
 
   if (loaderPromise) return loaderPromise;
+
+  window.gm_authFailure = handleAuthFailure;
 
   loaderPromise = new Promise<GoogleMapsApi>((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>(

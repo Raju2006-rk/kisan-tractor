@@ -6,6 +6,8 @@ import type { Map as LeafletMap, Marker } from "leaflet";
 import {
   hasGoogleMapsKey,
   loadGoogleMaps,
+  onGoogleMapsAuthFailure,
+  watchGoogleMapsError,
   type GoogleInfoWindow,
   type GoogleMap,
   type GoogleMarker,
@@ -85,44 +87,64 @@ function GoogleFarmerLocationMap({
   }, [t]);
   const [ready, setReady] = useState(false);
 
+  useEffect(() => onGoogleMapsAuthFailure(onError), [onError]);
+
   useEffect(() => {
     let cancelled = false;
+    const stopWatching = containerRef.current
+      ? watchGoogleMapsError(containerRef.current, onError)
+      : () => {};
+    const stopWatchingTimer = window.setTimeout(stopWatching, 10000);
+    let healthTimer: number | undefined;
     loadGoogleMaps()
       .then((google) => {
         if (cancelled || !containerRef.current || mapRef.current) return;
-        const map = new google.maps.Map(containerRef.current, {
-          center: { lat: farm.lat, lng: farm.lng },
-          zoom: 14,
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: false,
-          clickableIcons: false,
-          gestureHandling: "cooperative",
-        });
-        mapRef.current = map;
-        infoRef.current = new google.maps.InfoWindow();
+        try {
+          const map = new google.maps.Map(containerRef.current, {
+            center: { lat: farm.lat, lng: farm.lng },
+            zoom: 14,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            clickableIcons: false,
+            gestureHandling: "cooperative",
+          });
+          mapRef.current = map;
+          infoRef.current = new google.maps.InfoWindow();
 
-        const farmMarker = new google.maps.Marker({
-          position: { lat: farm.lat, lng: farm.lng },
-          map,
-          title: farm.label,
-          label: "F",
-        });
-        farmMarker.addListener("click", () => {
-          infoRef.current?.setContent(
-            `<div style="font-family:Manrope,sans-serif;min-width:170px;padding:2px 0;">
-              <div style="font-family:Fraunces,Georgia,serif;font-size:15px;color:#163b2a;">${escapeHtml(
-                farm.label,
-              )}</div>
-              <div style="margin-top:2px;font-size:11px;color:#667066;">${escapeHtml(
-                farm.village,
-              )} · Farm land</div>
-            </div>`,
-          );
-          infoRef.current?.open({ map, anchor: farmMarker });
-        });
-        farmMarkerRef.current = farmMarker;
-        setReady(true);
+          const farmMarker = new google.maps.Marker({
+            position: { lat: farm.lat, lng: farm.lng },
+            map,
+            title: farm.label,
+            label: "F",
+          });
+          farmMarker.addListener("click", () => {
+            infoRef.current?.setContent(
+              `<div style="font-family:Manrope,sans-serif;min-width:170px;padding:2px 0;">
+                <div style="font-family:Fraunces,Georgia,serif;font-size:15px;color:#163b2a;">${escapeHtml(
+                  farm.label,
+                )}</div>
+                <div style="margin-top:2px;font-size:11px;color:#667066;">${escapeHtml(
+                  farm.village,
+                )} · Farm land</div>
+              </div>`,
+            );
+            infoRef.current?.open({ map, anchor: farmMarker });
+          });
+          farmMarkerRef.current = farmMarker;
+          setReady(true);
+          // Backup for a key that is rejected without Google's error overlay.
+          healthTimer = window.setTimeout(() => {
+            if (
+              !cancelled &&
+              !containerRef.current?.querySelector(".gm-style")
+            ) {
+              onError();
+            }
+          }, 12000);
+        } catch {
+          if (!cancelled) onError();
+        }
       })
       .catch(() => {
         if (!cancelled) onError();
@@ -130,6 +152,9 @@ function GoogleFarmerLocationMap({
 
     return () => {
       cancelled = true;
+      window.clearTimeout(stopWatchingTimer);
+      if (healthTimer) window.clearTimeout(healthTimer);
+      stopWatching();
       farmMarkerRef.current?.setMap(null);
       farmerMarkerRef.current?.setMap(null);
       farmMarkerRef.current = null;

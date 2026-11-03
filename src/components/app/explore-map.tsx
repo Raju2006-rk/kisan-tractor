@@ -6,6 +6,8 @@ import type { Map as LeafletMap } from "leaflet";
 import {
   hasGoogleMapsKey,
   loadGoogleMaps,
+  onGoogleMapsAuthFailure,
+  watchGoogleMapsError,
   type GoogleInfoWindow,
   type GoogleMap,
   type GoogleMarker,
@@ -80,23 +82,43 @@ function GoogleExploreMap({
   const [ready, setReady] = useState(false);
   const { t } = useI18n();
 
+  useEffect(() => onGoogleMapsAuthFailure(onError), [onError]);
+
   useEffect(() => {
     let cancelled = false;
+    const stopWatching = containerRef.current
+      ? watchGoogleMapsError(containerRef.current, onError)
+      : () => {};
+    const stopWatchingTimer = window.setTimeout(stopWatching, 10000);
+    let healthTimer: number | undefined;
     loadGoogleMaps()
       .then((google) => {
         if (cancelled || !containerRef.current || mapRef.current) return;
-        const map = new google.maps.Map(containerRef.current, {
-          center,
-          zoom: 11,
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: false,
-          clickableIcons: false,
-          gestureHandling: "cooperative",
-        });
-        mapRef.current = map;
-        infoRef.current = new google.maps.InfoWindow();
-        setReady(true);
+        try {
+          const map = new google.maps.Map(containerRef.current, {
+            center,
+            zoom: 11,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            clickableIcons: false,
+            gestureHandling: "cooperative",
+          });
+          mapRef.current = map;
+          infoRef.current = new google.maps.InfoWindow();
+          setReady(true);
+          // Backup for a key that is rejected without Google's error overlay.
+          healthTimer = window.setTimeout(() => {
+            if (
+              !cancelled &&
+              !containerRef.current?.querySelector(".gm-style")
+            ) {
+              onError();
+            }
+          }, 12000);
+        } catch {
+          if (!cancelled) onError();
+        }
       })
       .catch(() => {
         if (!cancelled) onError();
@@ -104,6 +126,9 @@ function GoogleExploreMap({
 
     return () => {
       cancelled = true;
+      window.clearTimeout(stopWatchingTimer);
+      if (healthTimer) window.clearTimeout(healthTimer);
+      stopWatching();
       markersRef.current.forEach((marker) => marker.setMap(null));
       markersRef.current = [];
       infoRef.current?.close();
