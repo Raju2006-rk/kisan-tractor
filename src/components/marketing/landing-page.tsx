@@ -23,7 +23,6 @@ import {
   ReceiptText,
   ShieldCheck,
   Sprout,
-  Star,
   Tractor,
   Users,
   Wallet,
@@ -33,7 +32,7 @@ import { Logo } from "@/components/ui/logo";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { Photo } from "@/components/ui/photo";
 import { Badge, buttonStyles, Card, SectionHeading } from "@/components/ui/primitives";
-import { PHOTOS, PRICING_UNITS, SERVICES } from "@/lib/constants";
+import { PHOTOS, SERVICES } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 import { formatRupees } from "@/lib/pricing";
 import type { TractorWithOwner } from "@/lib/types";
@@ -47,14 +46,14 @@ const navItems = [
 ];
 
 const marqueeItems = [
-  "Ploughing",
-  "Rotavator",
-  "Trolley transport",
-  "Direct payments",
-  "No commission",
-  "Local owners",
-  "Nashik, Maharashtra",
-];
+  "service.ploughing",
+  "service.rotavation",
+  "service.trolley",
+  "landing.marquee.directPayments",
+  "landing.marquee.noCommission",
+  "landing.marquee.localOwners",
+  "landing.marquee.region",
+] as const;
 
 function Header() {
   const { t } = useI18n();
@@ -104,7 +103,7 @@ function Header() {
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
-            aria-label="Open menu"
+            aria-label={t("landing.menuOpen")}
             className="flex size-9 items-center justify-center rounded-full border border-forest/15 bg-paper/70 text-forest lg:hidden"
           >
             {open ? <X className="size-4" /> : <Menu className="size-4" />}
@@ -198,7 +197,7 @@ function Hero() {
             <div className="absolute inset-0">
               <Photo
                 src={PHOTOS.heroTractor}
-                alt="Tractor working in a field"
+                alt={t("landing.hero.imageAlt")}
                 className="h-full w-full"
                 sizes="(max-width: 1024px) 100vw, 50vw"
                 priority
@@ -207,41 +206,41 @@ function Hero() {
             </div>
             <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-4 sm:p-5">
               <span className="rounded-full border border-forest/10 bg-paper/80 px-3 py-1.5 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-forest backdrop-blur">
-                Niphad · Nashik
+                {t("landing.hero.regionBadge")}
               </span>
               <span className="flex items-center gap-1.5 rounded-full border border-forest/10 bg-paper/80 px-3 py-1.5 text-[0.65rem] font-semibold text-forest backdrop-blur">
                 <span className="size-1.5 rounded-full bg-forest pulse-ring" />
-                Local owners
+                {t("landing.hero.trust3")}
               </span>
             </div>
             <div className="pointer-events-none absolute bottom-4 left-4 right-4 flex flex-wrap items-end justify-between gap-2 sm:bottom-5 sm:left-5 sm:right-5">
               <div className="rounded-2xl border border-forest/10 bg-paper/85 px-3.5 py-2.5 backdrop-blur">
                 <p className="text-[0.6rem] font-bold uppercase tracking-[0.16em] text-stone">
-                  Local tractor
+                  {t("landing.hero.localTractor")}
                 </p>
                 <p className="mt-0.5 text-xs font-semibold text-forest">
-                  Hourly, per acre or per trip
+                  {t("landing.hero.pricingLine")}
                 </p>
               </div>
               <div className="hidden items-center gap-1.5 rounded-full bg-forest px-3 py-2 text-[0.65rem] font-semibold text-cream sm:flex">
-                <MapPin className="size-3" /> Nearby
+                <MapPin className="size-3" /> {t("landing.hero.nearby")}
               </div>
             </div>
           </div>
           <div className="absolute -left-3 top-1/2 hidden -translate-y-1/2 rotate-[-4deg] rounded-2xl border border-line bg-paper px-3 py-2.5 shadow-soft sm:block">
             <p className="flex items-center gap-1.5 text-[0.6rem] font-bold uppercase tracking-[0.14em] text-stone">
-              <Check className="size-3 text-forest" /> Direct payment
+              <Check className="size-3 text-forest" /> {t("landing.hero.directPayment")}
             </p>
             <p className="mt-0.5 text-[0.7rem] font-semibold text-forest">
-              Farmer → Owner
+              {t("landing.hero.farmerOwner")}
             </p>
           </div>
           <div className="absolute -right-2 bottom-12 hidden rotate-[3deg] rounded-2xl border border-line bg-paper px-3 py-2.5 shadow-soft md:block">
             <p className="text-[0.6rem] font-bold uppercase tracking-[0.14em] text-stone">
-              Final bill
+              {t("landing.hero.finalBill")}
             </p>
-            <p className="font-display text-lg text-forest">₹1,200</p>
-            <p className="text-[0.6rem] text-stone">90 active min · no break billed</p>
+            <p className="mt-0.5 font-display text-lg text-forest">{t("landing.hero.finalBillValue")}</p>
+            <p className="text-[0.6rem] text-stone">{t("landing.hero.finalBillHint")}</p>
           </div>
         </motion.div>
       </div>
@@ -250,13 +249,13 @@ function Hero() {
         <div className="flex items-center justify-between gap-4 rounded-2xl border border-forest/10 bg-paper/60 px-4 py-3 backdrop-blur sm:px-5">
           <div className="flex items-center gap-2 text-[0.7rem] font-semibold text-forest">
             <Sprout className="size-4 text-moss" />
-            Built around real farm work
+            {t("landing.hero.trustBarTitle")}
           </div>
           <div className="no-scrollbar flex flex-1 items-center gap-6 overflow-hidden text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-stone/70">
-            <span className="hidden sm:inline">No commission</span>
-            <span className="hidden sm:inline">No payment gateway</span>
-            <span>Local owners</span>
-            <span className="hidden md:inline">Clear rates</span>
+            <span className="hidden sm:inline">{t("landing.hero.trustBar1")}</span>
+            <span className="hidden sm:inline">{t("landing.hero.trustBar2")}</span>
+            <span>{t("landing.hero.trust3")}</span>
+            <span className="hidden md:inline">{t("landing.hero.trustBar3")}</span>
           </div>
         </div>
       </div>
@@ -265,6 +264,7 @@ function Hero() {
 }
 
 function Marquee() {
+  const { t } = useI18n();
   return (
     <div className="overflow-hidden border-y border-line/70 bg-forest py-3.5 text-cream">
       <div className="animate-marquee flex w-max items-center gap-8 whitespace-nowrap">
@@ -273,7 +273,7 @@ function Marquee() {
             key={`${item}-${index}`}
             className="flex items-center gap-8 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-cream/75"
           >
-            {item}
+            {t(item)}
             <span className="size-1 rounded-full bg-wheat/70" />
           </span>
         ))}
@@ -308,7 +308,7 @@ function HowItWorks() {
     <section id="how" className="scroll-mt-24 py-16 sm:py-20 lg:py-24">
       <div className="container-page">
         <SectionHeading
-          eyebrow="Simple from start to finish"
+          eyebrow={t("landing.how.eyebrow")}
           title={t("landing.how.title")}
           body={t("landing.how.subtitle")}
         />
@@ -342,13 +342,13 @@ function HowItWorks() {
         </div>
         <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-line/70 bg-paper/60 px-5 py-4 text-xs text-stone">
           <span className="inline-flex items-center gap-1.5 font-semibold text-forest">
-            <Clock3 className="size-3.5" /> Hourly work is billed on active time only
+            <Clock3 className="size-3.5" /> {t("landing.how.bullet1")}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <ReceiptText className="size-3.5" /> The final bill is based on actual work
+            <ReceiptText className="size-3.5" /> {t("landing.how.bullet2")}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <ShieldCheck className="size-3.5" /> KisanTractor holds no money
+            <ShieldCheck className="size-3.5" /> {t("landing.how.bullet3")}
           </span>
         </div>
       </div>
@@ -357,18 +357,18 @@ function HowItWorks() {
 }
 
 function Services() {
-  const { t } = useI18n();
+  const { t, serviceLabel } = useI18n();
   return (
     <section id="services" className="scroll-mt-24 bg-[#f1ead9] py-16 sm:py-20 lg:py-24">
       <div className="container-page">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <SectionHeading
-            eyebrow="Local owners, ready to help"
+            eyebrow={t("landing.services.eyebrow")}
             title={t("landing.services.title")}
             body={t("landing.services.subtitle")}
           />
           <Link href="/explore" className={buttonStyles("outline", "sm", "shrink-0")}>
-            Explore services <ArrowUpRight className="size-3.5" />
+            {t("landing.services.cta")} <ArrowUpRight className="size-3.5" />
           </Link>
         </div>
         <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -386,19 +386,21 @@ function Services() {
               >
                 <Photo
                   src={service.image}
-                  alt={service.name}
+                  alt={serviceLabel(service.id)}
                   className="h-40 w-full"
                   imageClassName="transition duration-700 group-hover:scale-105"
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                 />
                 <div className="p-5">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-display text-xl text-forest">{service.name}</h3>
+                    <h3 className="font-display text-xl text-forest">{serviceLabel(service.id)}</h3>
                     <ArrowUpRight className="size-4 text-stone transition group-hover:text-clay" />
                   </div>
-                  <p className="mt-1.5 text-xs leading-relaxed text-stone">{service.short}</p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-stone">
+                    {t(`serviceShort.${service.id}` as Parameters<typeof t>[0])}
+                  </p>
                   <p className="mt-3 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-moss">
-                    {service.unitHint}
+                    {t(`serviceUnit.${service.id}` as Parameters<typeof t>[0])}
                   </p>
                 </div>
               </Link>
@@ -411,21 +413,22 @@ function Services() {
 }
 
 function TractorCard({ tractor, priority = false }: { tractor: TractorWithOwner; priority?: boolean }) {
+  const { t } = useI18n();
   const rates = [
     tractor.pricing.hourlyEnabled && {
-      label: "Hourly",
+      label: t("app.hourly"),
       value: tractor.pricing.hourlyRate,
-      unit: PRICING_UNITS.hourly,
+      unit: t("common.perHour"),
     },
     tractor.pricing.acreEnabled && {
-      label: "Per acre",
+      label: t("app.perAcre"),
       value: tractor.pricing.acreRate,
-      unit: PRICING_UNITS.acre,
+      unit: t("common.perAcre"),
     },
     tractor.pricing.tripEnabled && {
-      label: "Per trip",
+      label: t("app.perTrip"),
       value: tractor.pricing.tripRate,
-      unit: PRICING_UNITS.trip,
+      unit: t("common.perTrip"),
     },
   ].filter(Boolean) as { label: string; value: number; unit: string }[];
 
@@ -445,12 +448,12 @@ function TractorCard({ tractor, priority = false }: { tractor: TractorWithOwner;
         />
         <div className="absolute left-3 top-3 flex gap-1.5">
           <Badge tone="green" dot>
-            Available
+            {t("common.available")}
           </Badge>
           <Badge tone="stone">{tractor.horsepower} HP</Badge>
         </div>
         <span className="absolute bottom-3 right-3 rounded-full bg-ink/70 px-2.5 py-1 text-[0.65rem] font-semibold text-cream backdrop-blur">
-          {tractor.distanceKm} km from Nashik
+          {t("landing.kmFromNashik", { km: tractor.distanceKm })}
         </span>
       </div>
       <div className="p-5">
@@ -463,9 +466,6 @@ function TractorCard({ tractor, priority = false }: { tractor: TractorWithOwner;
               {tractor.owner.name} · {tractor.village}, {tractor.district}
             </p>
           </div>
-          <span className="flex items-center gap-0.5 rounded-full bg-wheat/25 px-2 py-1 text-[0.65rem] font-semibold text-[#7a5a1d]">
-            <Star className="size-3 fill-current" /> 4.8
-          </span>
         </div>
         <div className="mt-4 flex flex-wrap gap-1.5">
           {rates.map((rate) => (
@@ -496,7 +496,7 @@ function NearbyTractors() {
       <div className="container-page">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <SectionHeading
-            eyebrow="A look around Niphad, Nashik"
+            eyebrow={t("landing.nearby.eyebrow")}
             title={t("landing.nearby.title")}
             body={t("landing.nearby.subtitle")}
           />
@@ -514,7 +514,7 @@ function NearbyTractors() {
               ))}
         </div>
         <p className="mt-4 text-center text-[0.7rem] text-stone">
-          Rates vary by equipment and owner. Your selected rate is shown before you send a booking request.
+          {t("landing.nearby.note")}
         </p>
       </div>
     </section>
@@ -528,7 +528,7 @@ function DirectPayment() {
       <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(#f7f2e6_1px,transparent_1px)] [background-size:26px_26px]" />
       <div className="container-page relative grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
         <div>
-          <span className="eyebrow !text-wheat">Farmer → Tractor owner</span>
+          <span className="eyebrow !text-wheat">{t("landing.payment.eyebrow")}</span>
           <h2 className="mt-4 text-balance font-display text-3xl leading-tight sm:text-4xl lg:text-[2.9rem]">
             {t("landing.payment.title")}
           </h2>
@@ -537,20 +537,20 @@ function DirectPayment() {
           </p>
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <span className="flex items-center gap-2 rounded-full border border-cream/15 bg-cream/5 px-3.5 py-2 text-xs font-semibold">
-              <Users className="size-3.5 text-wheat" /> Farmer
+              <Users className="size-3.5 text-wheat" /> {t("landing.payment.farmer")}
             </span>
             <span className="flex items-center gap-1 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-wheat/80">
-              <ArrowRight className="size-4" /> Direct
+              <ArrowRight className="size-4" /> {t("landing.payment.direct")}
             </span>
             <span className="flex items-center gap-2 rounded-full border border-cream/15 bg-cream/5 px-3.5 py-2 text-xs font-semibold">
-              <Tractor className="size-3.5 text-wheat" /> Tractor owner
+              <Tractor className="size-3.5 text-wheat" /> {t("landing.payment.owner")}
             </span>
           </div>
           <ul className="mt-7 space-y-2.5 text-sm text-cream/75">
             {[
-              "No commission. No transaction charge. No money held.",
-              "Pay by UPI, cash, bank transfer or another agreed method.",
-              "Only the tractor owner confirms payment received.",
+              t("landing.payment.bullet1"),
+              t("landing.payment.bullet2"),
+              t("landing.payment.bullet3"),
             ].map((item) => (
               <li key={item} className="flex items-start gap-2.5">
                 <CircleCheck className="mt-0.5 size-4 shrink-0 text-wheat" />
@@ -565,7 +565,7 @@ function DirectPayment() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-stone">
-                  Final Bill Amount
+                  {t("landing.payment.bill")}
                 </p>
                 <p className="mt-1 font-display text-4xl text-forest">₹1,200</p>
               </div>
@@ -575,42 +575,42 @@ function DirectPayment() {
             </div>
             <div className="mt-4 space-y-2 rounded-2xl bg-cream/80 p-3.5 text-xs">
               <div className="flex items-center justify-between">
-                <span className="text-stone">Ploughing · 50 HP tractor</span>
+                <span className="text-stone">{t("landing.payment.exampleService")}</span>
                 <span className="font-semibold text-forest">₹800 / hour</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-stone">Active work</span>
+                <span className="text-stone">{t("landing.payment.activeWork")}</span>
                 <span className="font-semibold text-forest">90 minutes</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-stone">Break · not billed</span>
+                <span className="text-stone">{t("landing.payment.breakLabel")}</span>
                 <span className="font-semibold text-forest">30 minutes</span>
               </div>
               <div className="border-t border-line pt-2 text-[0.68rem] text-stone">
-                90 min ÷ 60 × ₹800 = ₹1,200
+                {t("landing.payment.math")}
               </div>
             </div>
             <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-line px-3.5 py-3">
               <div>
                 <p className="text-[0.62rem] font-bold uppercase tracking-[0.16em] text-stone">
-                  Payment Received
+                  {t("landing.payment.received")}
                 </p>
                 <p className="mt-0.5 text-xs font-semibold text-clay-dark">
-                  Not yet confirmed by owner
+                  {t("landing.payment.notConfirmed")}
                 </p>
               </div>
               <span className="rounded-full bg-clay/10 px-2.5 py-1 text-[0.65rem] font-semibold text-clay-dark">
-                Direct payment
+                {t("landing.payment.directBadge")}
               </span>
             </div>
             <p className="mt-4 flex items-start gap-2 text-[0.68rem] leading-relaxed text-stone">
               <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-forest" />
-              Recording a payment is not a receipt. Only the tractor owner confirms payment received.
+              {t("landing.payment.recording")} {t("landing.payment.onlyOwner")}
             </p>
           </div>
           <div className="absolute -bottom-4 -right-3 hidden rotate-[2deg] rounded-2xl bg-wheat px-4 py-2.5 text-ink shadow-soft sm:block">
             <p className="text-[0.6rem] font-bold uppercase tracking-[0.16em] text-forest/60">
-              Platform charges
+              {t("landing.payment.platformCharges")}
             </p>
             <p className="font-display text-xl text-forest">₹0</p>
           </div>
@@ -628,21 +628,21 @@ function OwnerSection() {
         <div className="relative">
           <Photo
             src={PHOTOS.ownerDriver}
-            alt="Tractor owner in his field"
+            alt={t("landing.owner.imageAlt")}
             className="aspect-[4/5] w-full rounded-[2rem] sm:aspect-[5/4] lg:aspect-[4/5]"
             sizes="(max-width: 1024px) 100vw, 45vw"
           />
           <div className="absolute bottom-5 left-5 right-5 rounded-2xl border border-cream/20 bg-forest/85 p-4 text-cream backdrop-blur">
             <p className="text-[0.6rem] font-bold uppercase tracking-[0.18em] text-wheat">
-              Tractor owner · Niphad, Nashik
+              {t("landing.owner.badge")}
             </p>
             <p className="mt-1 font-display text-xl">
-              “My tractor, my rates. The farmer pays me directly.”
+              {t("landing.owner.quote")}
             </p>
             <div className="mt-2 flex items-center gap-3 text-[0.65rem] text-cream/65">
-              <span>50 HP tractor</span>
+              <span>{t("landing.owner.quoteMeta1")}</span>
               <span className="size-1 rounded-full bg-cream/30" />
-              <span>Direct payments, no commission</span>
+              <span>{t("landing.owner.quoteMeta2")}</span>
             </div>
           </div>
         </div>
@@ -679,9 +679,9 @@ function OwnerSection() {
               {t("landing.owner.cta")} <ArrowRight className="size-4" />
             </Link>
             <p className="text-[0.7rem] leading-relaxed text-stone">
-              No commission. No platform wallet.
+              {t("landing.owner.bottom1")}
               <br />
-              Farmers pay you directly.
+              {t("landing.owner.bottom2")}
             </p>
           </div>
         </div>
@@ -692,7 +692,12 @@ function OwnerSection() {
 
 function IvrSection() {
   const { t } = useI18n();
-  const flow = ["Language", "Location", "Farming work", "Booking request"];
+  const flow = [
+    "landing.ivr.flow1",
+    "landing.ivr.flow2",
+    "landing.ivr.flow3",
+    "landing.ivr.flow4",
+  ] as const;
   return (
     <section className="py-16 sm:py-20">
       <div className="container-page">
@@ -718,10 +723,10 @@ function IvrSection() {
             <div className="rounded-[1.5rem] border border-forest/10 bg-paper/75 p-5 backdrop-blur">
               <div className="flex items-center justify-between">
                 <p className="text-[0.62rem] font-bold uppercase tracking-[0.16em] text-stone">
-                  Future flow
+                  {t("landing.ivr.flowTitle")}
                 </p>
                 <span className="rounded-full bg-wheat/50 px-2.5 py-1 text-[0.6rem] font-bold uppercase tracking-[0.14em] text-forest">
-                  Coming soon
+                  {t("landing.ivr.comingSoon")}
                 </span>
               </div>
               <ol className="mt-4 space-y-2">
@@ -733,13 +738,13 @@ function IvrSection() {
                     <span className="flex size-6 items-center justify-center rounded-full bg-forest text-[0.62rem] text-cream">
                       {index + 1}
                     </span>
-                    {item}
+                    {t(item)}
                     <ArrowRight className="ml-auto size-3.5 text-stone/50" />
                   </li>
                 ))}
               </ol>
               <p className="mt-4 text-[0.65rem] leading-relaxed text-stone">
-                No phone number is shown until the IVR service is live. The future service will use the same KisanTractor backend.
+                {t("landing.ivr.footerNote")}
               </p>
             </div>
           </div>
@@ -750,42 +755,27 @@ function IvrSection() {
 }
 
 const faqs = [
-  {
-    q: "Does KisanTractor charge a commission?",
-    a: "No. There is no commission or transaction charge. Pay the tractor owner directly; we do not hold your money.",
-  },
-  {
-    q: "Can I book for a family member?",
-    a: "Yes. Choose “Book for someone else” and add their name and mobile. They do not need a separate account.",
-  },
-  {
-    q: "Am I charged for breaks during hourly work?",
-    a: "No. Only active work time is billed at your agreed rate. Paused time is recorded separately and excluded.",
-  },
-  {
-    q: "What if I have a billing or payment issue?",
-    a: "Report the issue from the booking. The original bill stays available while the issue is reviewed.",
-  },
-  {
-    q: "How does payment work?",
-    a: "After the work is finished, the final bill is calculated. You pay the tractor owner directly using UPI, cash, bank transfer or another agreed method. The owner confirms receipt.",
-  },
-];
+  { q: "landing.faq.q1", a: "landing.faq.a1" },
+  { q: "landing.faq.q2", a: "landing.faq.a2" },
+  { q: "landing.faq.q3", a: "landing.faq.a3" },
+  { q: "landing.faq.q4", a: "landing.faq.a4" },
+  { q: "landing.faq.q5", a: "landing.faq.a5" },
+] as const;
 
 function Faq() {
   const { t } = useI18n();
   return (
     <section id="faq" className="scroll-mt-24 bg-[#f1ead9] py-16 sm:py-20 lg:py-24">
       <div className="container-page grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
-        <SectionHeading eyebrow="A few things you may want to know" title={t("landing.faq.title")} body={t("landing.faq.subtitle")} />
+        <SectionHeading eyebrow={t("landing.faq.eyebrow")} title={t("landing.faq.title")} body={t("landing.faq.subtitle")} />
         <div className="divide-y divide-line/80 border-y border-line/80">
           {faqs.map((faq) => (
             <details key={faq.q} className="group py-4">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold text-forest">
-                {faq.q}
+                {t(faq.q)}
                 <ChevronDown className="size-4 shrink-0 text-stone transition group-open:rotate-180" />
               </summary>
-              <p className="mt-2.5 max-w-2xl text-xs leading-relaxed text-stone">{faq.a}</p>
+              <p className="mt-2.5 max-w-2xl text-xs leading-relaxed text-stone">{t(faq.a)}</p>
             </details>
           ))}
         </div>
@@ -800,13 +790,13 @@ function FinalCta() {
     <section className="relative overflow-hidden">
       <Photo
         src={PHOTOS.fieldAerial}
-        alt="Aerial view of farm fields"
+        alt={t("landing.cta.imageAlt")}
         className="absolute inset-0 h-full w-full"
         sizes="100vw"
       />
       <div className="absolute inset-0 bg-forest/85" />
       <div className="container-page relative py-20 text-center sm:py-24">
-        <span className="eyebrow !text-wheat">Better connections. Stronger villages.</span>
+        <span className="eyebrow !text-wheat">{t("landing.cta.eyebrow")}</span>
         <h2 className="mx-auto mt-4 max-w-3xl text-balance font-display text-3xl leading-tight text-cream sm:text-4xl lg:text-5xl">
           {t("landing.cta.title")}
         </h2>
@@ -821,7 +811,7 @@ function FinalCta() {
             href="/auth?role=owner"
             className={buttonStyles("outline", "lg", "border-cream/25 text-cream hover:bg-cream/10")}
           >
-            List your tractor
+            {t("landing.cta.list")}
           </Link>
         </div>
       </div>
@@ -841,7 +831,7 @@ function Footer() {
               {t("footer.tagline")}
             </p>
             <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-cream/10 px-3 py-1.5 text-[0.65rem] text-cream/60">
-              <MapPin className="size-3" /> Nashik, Maharashtra
+              <MapPin className="size-3" /> {t("footer.location")}
             </p>
           </div>
           <div>
@@ -870,10 +860,10 @@ function Footer() {
             </p>
             <div className="mt-3 flex items-center gap-2 text-xs text-cream/65">
               <Languages className="size-3.5" />
-              <span>English · हिंदी · मराठी</span>
+              <span>{t("footer.languages")}</span>
             </div>
             <p className="mt-2 text-[0.65rem] text-cream/40">
-              தமிழ் · తెలుగు · ಕನ್ನಡ · More coming soon
+              {t("footer.languagesNote")}
             </p>
           </div>
         </div>
@@ -883,7 +873,7 @@ function Footer() {
             <span>{t("footer.privacy")}</span>
             <span>{t("footer.terms")}</span>
             <span className="inline-flex items-center gap-1.5">
-              <BadgeCheck className="size-3" /> Direct payments only
+              <BadgeCheck className="size-3" /> {t("footer.directPayments")}
             </span>
           </div>
         </div>

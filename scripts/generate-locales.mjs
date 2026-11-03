@@ -42,6 +42,13 @@ const FORCE_KEYS = [
   "app.ownerConfirmWarning",
   "app.paymentNotReceipt",
   "app.confirmWarning",
+  "auth.testimonial",
+  "auth.testimonialBy",
+  "auth.testimonialPlace",
+  "tractor.ownedBy",
+  "tractor.ownerRole",
+  "tractor.serviceArea",
+  "tractor.idLabel",
 ];
 for (const language of Object.keys(cache)) {
   for (const key of FORCE_KEYS) delete cache[language][key];
@@ -84,8 +91,34 @@ function placeholders(value) {
   return [...value.matchAll(/\{[a-zA-Z0-9_]+\}/g)].map((match) => match[0]);
 }
 
+function protectPlaceholders(value) {
+  const tokens = placeholders(value);
+  let protectedValue = value;
+  tokens.forEach((token, index) => {
+    protectedValue = protectedValue.replaceAll(token, `[[[KT_PH_${index}]]]`);
+  });
+  return { protectedValue, tokens };
+}
+
+function restorePlaceholders(value, tokens) {
+  return tokens.reduce(
+    (text, token, index) =>
+      text.replace(
+        new RegExp(`\\[\\[\\[\\s*KT_PH_${index}\\s*\\]\\]\\]`, "gi"),
+        token,
+      ),
+    value,
+  );
+}
+
 async function translateGroup(entries, code) {
-  const text = entries.map(([, value]) => value).join(`\n${SEP}\n`);
+  const protectedEntries = entries.map(([key, value]) => {
+    const { protectedValue, tokens } = protectPlaceholders(value);
+    return { key, value, protectedValue, tokens };
+  });
+  const text = protectedEntries
+    .map((entry) => entry.protectedValue)
+    .join(`\n${SEP}\n`);
   const translated = await translateText(text, code);
   const parts = translated.split(new RegExp(`\\s*\\[\\[\\[KTSEP\\]\\]\\]\\s*`));
   if (parts.length !== entries.length) {
@@ -96,18 +129,21 @@ async function translateGroup(entries, code) {
     return { ...left, ...right };
   }
   const result = {};
-  entries.forEach(([key, value], index) => {
-    const candidate = parts[index].trim();
-    const needed = placeholders(value);
+  protectedEntries.forEach((entry, index) => {
+    const candidate = restorePlaceholders(parts[index].trim(), entry.tokens);
+    const needed = placeholders(entry.value);
     const intact = needed.every((token) => candidate.includes(token));
-    result[key] = intact && candidate ? candidate : value;
+    result[entry.key] = intact && candidate ? candidate : entry.value;
   });
   return result;
 }
 
 async function translateLanguage(code, baseCode) {
   const existing = cache[code] ?? {};
-  const result = { ...existing };
+  const result = {};
+  for (const key of keys) {
+    if (key in existing) result[key] = existing[key];
+  }
   const missing = keys.filter((key) => !(key in result));
   if (missing.length === 0) return result;
   const entries = missing.map((key) => [key, en[key]]);

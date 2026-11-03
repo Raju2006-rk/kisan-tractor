@@ -99,24 +99,24 @@ export function BookingsScreen({ role }: { role: Role }) {
 
   const emptyCopy: Record<Tab, { title: string; body: string }> = {
     requests: {
-      title: "No new requests",
-      body: "When a nearby farmer sends a booking request, it will appear here for you to accept or reject.",
+      title: t("app.noNewRequests"),
+      body: t("app.noNewRequestsBody"),
     },
     active: {
-      title: "No active work right now",
+      title: t("app.noActiveWork"),
       body: isOwner
-        ? "Start an accepted job from Upcoming and it will appear here with live active time."
-        : "When a job starts, you will see live active time, pauses and the final bill here.",
+        ? t("app.noActiveOwnerBody")
+        : t("app.noActiveFarmerBody"),
     },
     upcoming: {
-      title: "Nothing upcoming",
+      title: t("app.nothingUpcoming"),
       body: isOwner
-        ? "Accepted requests for a future date appear here. Keep your availability on for new work."
-        : "Requests waiting for the owner and accepted future bookings appear here.",
+        ? t("app.nothingUpcomingOwnerBody")
+        : t("app.nothingUpcomingFarmerBody"),
     },
     history: {
-      title: "No past bookings",
-      body: "Completed, cancelled and expired bookings are kept here with their full records.",
+      title: t("app.noPastBookings"),
+      body: t("app.noPastBookingsBody"),
     },
   };
 
@@ -129,7 +129,7 @@ export function BookingsScreen({ role }: { role: Role }) {
               {isOwner ? t("app.ownerTag") : t("app.farmerTag")}
             </Badge>
             <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone/70">
-              Niphad · Nashik
+              {t("app.bookingRecords")}
             </span>
           </div>
           <h1 className="mt-2 font-display text-3xl text-forest sm:text-[2.4rem]">
@@ -196,7 +196,7 @@ export function BookingsScreen({ role }: { role: Role }) {
                 tone: "bg-forest/8 text-forest",
               },
               {
-                label: "Payment due",
+                label: t("app.paymentDue"),
                 value: groups.active.filter((booking) =>
                   ["BILL_GENERATED", "PAYMENT_PENDING"].includes(booking.status),
                 ).length,
@@ -232,14 +232,14 @@ export function BookingsScreen({ role }: { role: Role }) {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search bookings"
+            placeholder={t("app.searchBookings")}
             className="min-w-0 flex-1 bg-transparent text-xs text-ink placeholder:text-stone/55 focus:outline-none"
           />
           {query ? (
             <button
               type="button"
               onClick={() => setQuery("")}
-              aria-label="Clear search"
+              aria-label={t("common.clearSearch")}
               className="text-stone/60 hover:text-forest"
             >
               <X className="size-3.5" />
@@ -270,11 +270,11 @@ export function BookingsScreen({ role }: { role: Role }) {
           action={
             isOwner ? (
               <Link href="/owner/tractor" className={buttonStyles("outline", "sm")}>
-                Manage your tractor
+                {t("app.manageYourTractor")}
               </Link>
             ) : (
               <Link href="/explore" className={buttonStyles("primary", "sm")}>
-                Find a tractor <Compass className="size-3.5" />
+                {t("nav.findTractor")} <Compass className="size-3.5" />
               </Link>
             )
           }
@@ -301,7 +301,7 @@ export function BookingsScreen({ role }: { role: Role }) {
           </span>
           <div>
             <p className="text-sm font-semibold text-forest">
-              Final bill and payment received are separate records.
+              {t("app.finalBillPaymentSeparate")}
             </p>
             <p className="mt-0.5 max-w-2xl text-[0.7rem] leading-relaxed text-stone">
               {t("common.directPayment")} {t("app.onlyOwnerConfirm")}
@@ -309,7 +309,7 @@ export function BookingsScreen({ role }: { role: Role }) {
           </div>
         </div>
         <Link href="/help#billing" className={buttonStyles("outline", "sm", "shrink-0")}>
-          Billing help
+          {t("app.billingHelp")}
         </Link>
       </div>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import "leaflet/dist/leaflet.css";
 import type { Map as LeafletMap, Marker } from "leaflet";
 import {
   hasGoogleMapsKey,
@@ -10,6 +11,7 @@ import {
   type GoogleMarker,
 } from "@/lib/google-maps";
 import type { LiveLocation } from "@/lib/types";
+import { useI18n } from "@/lib/i18n";
 
 function escapeHtml(value: string) {
   return value
@@ -31,6 +33,7 @@ export default function FarmerLocationMap({
   farmer?: LiveLocation | null;
 }) {
   const [googleFailed, setGoogleFailed] = useState(false);
+  const { t } = useI18n();
   const useGoogle = hasGoogleMapsKey() && !googleFailed;
 
   return (
@@ -46,11 +49,11 @@ export default function FarmerLocationMap({
       )}
       <div className="pointer-events-none absolute left-2.5 top-2.5 z-[500] flex flex-wrap items-center gap-2 rounded-full border border-forest/10 bg-paper/95 px-2.5 py-1 text-[0.6rem] font-semibold text-forest shadow-sm backdrop-blur">
         <span className="inline-flex items-center gap-1">
-          <span className="size-1.5 rounded-full bg-forest" /> Farm land
+          <span className="size-1.5 rounded-full bg-forest" /> {t("app.farmLand")}
         </span>
         {farmer ? (
           <span className="inline-flex items-center gap-1">
-            <span className="size-1.5 rounded-full bg-clay" /> Farmer GPS
+            <span className="size-1.5 rounded-full bg-clay" /> {t("app.farmerGps")}
           </span>
         ) : null}
       </div>
@@ -72,6 +75,14 @@ function GoogleFarmerLocationMap({
   const farmMarkerRef = useRef<GoogleMarker | null>(null);
   const farmerMarkerRef = useRef<GoogleMarker | null>(null);
   const infoRef = useRef<GoogleInfoWindow | null>(null);
+  const { t } = useI18n();
+  const labelsRef = useRef({ title: "", shared: "" });
+  useEffect(() => {
+    labelsRef.current = {
+      title: t("app.farmerLiveLocation"),
+      shared: t("app.sharedForBooking"),
+    };
+  }, [t]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -148,14 +159,14 @@ function GoogleFarmerLocationMap({
       const marker = new google.maps.Marker({
         position: { lat: farmer.lat, lng: farmer.lng },
         map,
-        title: "Farmer live location",
+        title: labelsRef.current.title,
         label: "L",
       });
       marker.addListener("click", () => {
         infoRef.current?.setContent(
           `<div style="font-family:Manrope,sans-serif;min-width:150px;padding:2px 0;">
-            <div style="font-size:12px;font-weight:800;color:#163b2a;">Farmer live location</div>
-            <div style="margin-top:2px;font-size:11px;color:#667066;">Shared for this booking</div>
+            <div style="font-size:12px;font-weight:800;color:#163b2a;">${escapeHtml(labelsRef.current.title)}</div>
+            <div style="margin-top:2px;font-size:11px;color:#667066;">${escapeHtml(labelsRef.current.shared)}</div>
           </div>`,
         );
         infoRef.current?.open({ map, anchor: marker });
@@ -190,6 +201,14 @@ function LeafletFarmerLocationMap({
   const farmMarkerRef = useRef<Marker | null>(null);
   const farmerMarkerRef = useRef<Marker | null>(null);
   const [ready, setReady] = useState(false);
+  const { t } = useI18n();
+  const labelsRef = useRef({ title: "", shared: "" });
+  useEffect(() => {
+    labelsRef.current = {
+      title: t("app.farmerLiveLocation"),
+      shared: t("app.sharedForBooking"),
+    };
+  }, [t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -275,8 +294,8 @@ function LeafletFarmerLocationMap({
         .addTo(map)
         .bindPopup(
           `<div style="font-family:Manrope,sans-serif;min-width:150px;padding:2px 0;">
-            <div style="font-size:12px;font-weight:800;color:#163b2a;">Farmer live location</div>
-            <div style="margin-top:2px;font-size:11px;color:#667066;">Shared for this booking</div>
+            <div style="font-size:12px;font-weight:800;color:#163b2a;">${escapeHtml(labelsRef.current.title)}</div>
+            <div style="margin-top:2px;font-size:11px;color:#667066;">${escapeHtml(labelsRef.current.shared)}</div>
           </div>`,
         );
       map.fitBounds(

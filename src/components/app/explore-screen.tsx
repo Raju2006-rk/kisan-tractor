@@ -29,7 +29,7 @@ import { useToast } from "@/components/providers/app-providers";
 import { SERVICES, VILLAGES } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 import type { PricingType, ServiceType, SessionUser, TractorWithOwner } from "@/lib/types";
-import { cn, haversineKm, reverseGeocode } from "@/lib/utils";
+import { cn, reverseGeocode } from "@/lib/utils";
 
 const ExploreMap = dynamic(() => import("@/components/app/explore-map"), {
   ssr: false,
@@ -37,9 +37,6 @@ const ExploreMap = dynamic(() => import("@/components/app/explore-map"), {
 });
 
 type Sort = "nearest" | "price";
-
-/** How far a GPS reading may be from a known village and still be named. */
-const SERVICE_AREA_KM = 50;
 
 export function ExploreScreen({ user }: { user: SessionUser }) {
   const { t, serviceLabel } = useI18n();

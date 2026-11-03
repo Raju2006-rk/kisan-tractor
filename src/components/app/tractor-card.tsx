@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, MapPin, Star } from "lucide-react";
+import { ArrowRight, MapPin } from "lucide-react";
 import { Photo } from "@/components/ui/photo";
 import { Badge } from "@/components/ui/primitives";
-import { PRICING_UNITS } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 import { formatRupees } from "@/lib/pricing";
 import type { TractorWithOwner } from "@/lib/types";
@@ -22,19 +21,19 @@ export function TractorCard({
   const { t } = useI18n();
   const rates = [
     tractor.pricing.hourlyEnabled && {
-      label: "Hourly",
+      label: t("app.hourly"),
       value: tractor.pricing.hourlyRate,
-      unit: PRICING_UNITS.hourly,
+      unit: t("common.perHour"),
     },
     tractor.pricing.acreEnabled && {
-      label: "Per acre",
+      label: t("app.perAcre"),
       value: tractor.pricing.acreRate,
-      unit: PRICING_UNITS.acre,
+      unit: t("common.perAcre"),
     },
     tractor.pricing.tripEnabled && {
-      label: "Per trip",
+      label: t("app.perTrip"),
       value: tractor.pricing.tripRate,
-      unit: PRICING_UNITS.trip,
+      unit: t("common.perTrip"),
     },
   ].filter(Boolean) as { label: string; value: number; unit: string }[];
 
@@ -79,9 +78,6 @@ export function TractorCard({
               {tractor.owner.name} · {tractor.horsepower} HP
             </p>
           </div>
-          <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-wheat/25 px-2 py-0.5 text-[0.62rem] font-semibold text-[#7a5a1d]">
-            <Star className="size-2.5 fill-current" /> 4.8
-          </span>
         </div>
         <p className="mt-1.5 inline-flex items-center gap-1 text-[0.68rem] text-stone">
           <MapPin className="size-3" /> {tractor.village}, {tractor.district}

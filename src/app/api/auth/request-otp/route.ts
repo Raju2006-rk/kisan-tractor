@@ -61,7 +61,9 @@ export async function POST(request: Request) {
       });
     }
 
-    if (isSupabaseAuthConfigured()) {
+    const useDevOtp = isDevOtpEnabled();
+
+    if (!useDevOtp && isSupabaseAuthConfigured()) {
       try {
         await sendSupabaseOtp(mobile);
         return NextResponse.json({
@@ -73,11 +75,19 @@ export async function POST(request: Request) {
           name: existing?.name ?? null,
         });
       } catch (smsError) {
-        console.warn(
-          "[request-otp] Supabase SMS send failed (SMS provider likely not enabled in Supabase). Falling back to OTP challenge:",
-          smsError,
+        console.warn("[request-otp] Supabase SMS send failed:", smsError);
+        return jsonError(
+          "We could not send the OTP right now. Please try again in a few minutes.",
+          503,
         );
       }
+    }
+
+    if (!useDevOtp) {
+      return jsonError(
+        "Phone sign-in is not configured. Please contact support.",
+        503,
+      );
     }
 
     const challenge = await createOtpChallenge(mobile, role);
@@ -85,6 +95,7 @@ export async function POST(request: Request) {
       ok: true,
       signedIn: false,
       mobile,
+      // Only exposed in local development or when AUTH_DEV_OTP is explicitly on.
       devOtp: challenge.otp,
       expiresAt: challenge.expiresAt,
       isExisting: Boolean(existing),

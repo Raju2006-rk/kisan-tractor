@@ -41,7 +41,6 @@ import {
   StatusBadge,
 } from "@/components/ui/primitives";
 import { useToast } from "@/components/providers/app-providers";
-import { PRICING_LABELS, PRICING_UNITS, STATUS_META } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 import { billFormula, formatRupees, minutesToHoursLabel } from "@/lib/pricing";
 import type { BookingDetail, BookingStatus, Role } from "@/lib/types";
@@ -62,20 +61,21 @@ const CONTACT_STATUSES: BookingStatus[] = [
 
 function CopyButton({ value, label }: { value: string; label: string }) {
   const { push } = useToast();
+  const { t } = useI18n();
   return (
     <button
       type="button"
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(value);
-          push(`${label} copied.`, "success");
+          push(t("app.copiedLabel", { label }), "success");
         } catch {
-          push("Could not copy. Please select the text manually.", "error");
+          push(t("app.couldNotCopy"), "error");
         }
       }}
       className="inline-flex items-center gap-1 rounded-lg border border-line bg-paper px-2 py-1 text-[0.62rem] font-semibold text-forest transition hover:border-forest/30"
     >
-      <Copy className="size-3" /> Copy
+      <Copy className="size-3" /> {t("app.copy")}
     </button>
   );
 }
@@ -84,7 +84,6 @@ function StatusBanner({ booking, role }: { booking: BookingDetail; role: Role })
   const { t } = useI18n();
   const { minutes } = useWorkMinutes(booking);
   const status = booking.status;
-  const meta = STATUS_META[status];
 
   const tone =
     status === "PAUSED" || status === "PAYMENT_PENDING" || status === "BILL_GENERATED"
@@ -117,25 +116,29 @@ function StatusBanner({ booking, role }: { booking: BookingDetail; role: Role })
             )}
           </span>
           <div>
-            <p className="text-sm font-bold">{role === "owner" ? meta.ownerLabel : t(`status.${status}`)}</p>
+            <p className="text-sm font-bold">{t(`status.${status}`)}</p>
             <p className="mt-0.5 text-[0.7rem] leading-relaxed opacity-80">
               {status === "PAUSED"
-                ? `Break time is recorded separately and not billed. ${minutesToHoursLabel(minutes)} active so far.`
+                ? t("app.pausedStatusHint", { time: minutesToHoursLabel(minutes) })
                 : status === "IN_PROGRESS"
-                  ? `Active work is being recorded. ${minutesToHoursLabel(minutes)} active so far; pauses are not billed.`
+                  ? t("app.inProgressStatusHint", { time: minutesToHoursLabel(minutes) })
                   : status === "PAYMENT_PENDING"
                     ? role === "owner"
-                      ? `The final bill is ${formatRupees(booking.finalAmount)}. Mark payment done only after checking your own UPI app, bank account or cash.`
-                      : `The final bill is ${formatRupees(booking.finalAmount)}. Pay the owner directly outside KisanTractor. The owner will mark the payment done after receiving it.`
+                      ? t("app.paymentPendingOwnerHint", {
+                          amount: formatRupees(booking.finalAmount),
+                        })
+                      : t("app.paymentPendingFarmerHint", {
+                          amount: formatRupees(booking.finalAmount),
+                        })
                     : status === "BILL_GENERATED"
                       ? role === "owner"
-                        ? "The final bill is ready. Share it with the farmer and mark payment done only after the money reaches you."
-                        : "The final bill is ready. Review the amount and pay the owner directly."
+                        ? t("app.billReadyOwnerHint")
+                        : t("app.billReadyFarmerHint")
                       : status === "PENDING"
                         ? role === "owner"
-                          ? "This request is waiting for your decision. Accept only if you can commit to the time."
-                          : "Your request has been sent. The tractor owner must accept before work is scheduled."
-                        : meta.hint}
+                          ? t("app.pendingOwnerHint")
+                          : t("app.pendingFarmerHint")
+                        : t(`statusHint.${status}` as Parameters<typeof t>[0])}
             </p>
           </div>
         </div>
@@ -146,12 +149,24 @@ function StatusBanner({ booking, role }: { booking: BookingDetail; role: Role })
 }
 
 export function BookingDetailScreen({ bookingId, role }: { bookingId: string; role: Role }) {
-  const { t, serviceLabel } = useI18n();
+  const { t, serviceLabel, roleLabel } = useI18n();
   const { data, error, isLoading, mutate } = useSWR<{ booking: BookingDetail }>(
     `/api/bookings/${bookingId}`,
     { refreshInterval: 10000 },
   );
   const booking = data?.booking;
+  const pricingLabel =
+    booking?.pricingType === "hourly"
+      ? t("app.hourly")
+      : booking?.pricingType === "acre"
+        ? t("app.perAcre")
+        : t("app.perTrip");
+  const pricingUnit =
+    booking?.pricingType === "hourly"
+      ? t("common.perHour")
+      : booking?.pricingType === "acre"
+        ? t("common.perAcre")
+        : t("common.perTrip");
   const { minutes } = useWorkMinutes(
     booking ?? ({ status: "PENDING", workSession: null } as unknown as BookingDetail),
   );
@@ -173,11 +188,11 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
     return (
       <EmptyState
         icon={<AlertTriangle className="size-5" />}
-        title="Booking not found"
-        body={error instanceof Error ? error.message : "This booking is not available."}
+        title={t("app.bookingNotFound")}
+        body={error instanceof Error ? error.message : t("app.bookingNotAvailable")}
         action={
           <Link href="/bookings" className={buttonStyles("primary", "sm")}>
-            Back to bookings
+            {t("app.backToBookings")}
           </Link>
         }
       />
@@ -221,7 +236,7 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
           href="/bookings"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone transition hover:text-forest"
         >
-          <ArrowLeft className="size-3.5" /> Back to bookings
+          <ArrowLeft className="size-3.5" /> {t("app.backToBookings")}
         </Link>
         <span className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-stone/60">
           {t("app.bookingId")} · {booking.id}
@@ -247,7 +262,9 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
                 />
                 {booking.bookingFor === "other" ? (
                   <Badge tone="clay" className="!border-cream/20 !bg-cream/15 !text-cream">
-                    {t("app.forRecipient", { name: booking.recipientName ?? "someone else" })}
+                    {t("app.forRecipient", {
+                      name: booking.recipientName ?? t("app.someoneElse"),
+                    })}
                   </Badge>
                 ) : null}
               </div>
@@ -318,7 +335,7 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
                 <p className="mt-0.5 font-display text-lg text-forest">
                   {formatRupees(booking.agreedRate)}
                   <span className="text-[0.55rem] font-normal text-stone">
-                    {PRICING_UNITS[booking.pricingType]}
+                    {pricingUnit}
                   </span>
                 </p>
               </div>
@@ -343,11 +360,11 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
                   {booking.pricingType === "hourly"
                     ? t("app.workTimeline")
                     : booking.pricingType === "acre"
-                      ? "Measured area"
-                      : "Completed trips"}
+                      ? t("app.measuredArea")
+                      : t("app.completedTrips")}
                 </h2>
               </div>
-              <Badge tone="stone">{PRICING_LABELS[booking.pricingType]}</Badge>
+              <Badge tone="stone">{pricingLabel}</Badge>
             </div>
             <div className="mt-3">
               <WorkSummary booking={booking} />
@@ -355,8 +372,7 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
             {booking.pricingType === "hourly" ? (
               <p className="mt-3 flex items-start gap-1.5 text-[0.65rem] leading-relaxed text-stone">
                 <Info className="mt-0.5 size-3 shrink-0" />
-                Only active work segments are billed. Time while work is paused is shown separately
-                and excluded from the final bill.
+                {t("app.onlyActiveBilled")}
               </p>
             ) : null}
           </Card>
@@ -366,14 +382,14 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
               <div className="border-b border-line/80 px-4 py-3.5 sm:px-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="eyebrow">Final Bill Amount</p>
+                    <p className="eyebrow">{t("app.finalBillAmount")}</p>
                     <p className="mt-1 font-display text-3xl text-forest">
                       {formatRupees(finalAmount ?? booking.estimatedAmount)}
                     </p>
                   </div>
                   <div className="rounded-xl border border-line bg-cream/60 px-3 py-2 text-right">
                     <p className="text-[0.55rem] font-bold uppercase tracking-[0.12em] text-stone">
-                      Payment Received
+                      {t("app.paymentReceived")}
                     </p>
                     <p
                       className={cn(
@@ -385,17 +401,17 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
                     </p>
                     <p className="text-[0.58rem] text-stone">
                       {confirmedPayments.length > 0
-                        ? "Confirmed by owner"
+                        ? t("app.confirmedByOwner")
                         : recordedPayments.length > 0
-                          ? "Awaiting owner confirmation"
-                          : "Not yet confirmed"}
+                          ? t("app.awaitingOwnerConfirmation")
+                          : t("app.notYetConfirmed")}
                     </p>
                   </div>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.65rem] text-stone">
                   <span>
                     {formatRupees(booking.agreedRate)}
-                    {PRICING_UNITS[booking.pricingType]} · {PRICING_LABELS[booking.pricingType]}
+                    {pricingUnit} · {pricingLabel}
                   </span>
                   <span className="size-1 rounded-full bg-line" />
                   <span>
@@ -405,12 +421,11 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
               </div>
               <div className="px-4 py-3.5 sm:px-5">
                 <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-stone">
-                  Payment records
+                  {t("app.paymentRecords")}
                 </p>
                 {booking.payments.length === 0 ? (
                   <p className="mt-2 text-xs leading-relaxed text-stone">
-                    No payment has been recorded yet. The final bill is separate from payment
-                    received; only the owner confirms receipt.
+                    {t("app.noPaymentRecordedBody")}
                   </p>
                 ) : (
                   <div className="mt-2 space-y-2">
@@ -441,8 +456,12 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
                             </p>
                             <p className="text-[0.62rem] text-stone">
                               {payment.paymentStatus === "confirmed"
-                                ? `Confirmed ${formatDateTime(payment.confirmedAt ?? payment.paidAt)}`
-                                : `Recorded ${formatDateTime(payment.paidAt)} · awaiting owner confirmation`}
+                                ? t("app.confirmedAt", {
+                                    date: formatDateTime(payment.confirmedAt ?? payment.paidAt),
+                                  })
+                                : t("app.recordedAwaitingOwner", {
+                                    date: formatDateTime(payment.paidAt),
+                                  })}
                             </p>
                             {payment.notes ? (
                               <p className="mt-0.5 text-[0.62rem] text-stone/80">{payment.notes}</p>
@@ -453,7 +472,9 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
                           tone={payment.paymentStatus === "confirmed" ? "green" : "amber"}
                           dot
                         >
-                          {payment.paymentStatus === "confirmed" ? "Received" : "Recorded"}
+                          {payment.paymentStatus === "confirmed"
+                            ? t("app.received")
+                            : t("app.recordedPayment")}
                         </Badge>
                       </div>
                     ))}
@@ -462,13 +483,7 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
                 <div className="mt-3 rounded-xl border border-dashed border-line bg-paper px-3.5 py-3">
                   <p className="flex items-start gap-1.5 text-[0.65rem] leading-relaxed text-stone">
                     <ShieldCheck className="mt-0.5 size-3 shrink-0 text-forest" />
-                    <span>
-                      <strong className="text-forest">Final Bill Amount</strong> is what the owner
-                      calculated for the work.{" "}
-                      <strong className="text-forest">Payment Received</strong> is confirmed only
-                      after the owner checks their own UPI app, bank account or cash. KisanTractor
-                      does not collect this money.
-                    </span>
+                    <span>{t("app.finalBillExplain")}</span>
                   </p>
                 </div>
               </div>
@@ -490,21 +505,25 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
                   </div>
                 </div>
                 <Badge tone={booking.dispute.status === "resolved" ? "green" : "red"} dot>
-                  {booking.dispute.status === "resolved" ? "Resolved" : "Under review"}
+                  {booking.dispute.status === "resolved"
+                    ? t("app.resolved")
+                    : t("app.underReview")}
                 </Badge>
               </div>
               <p className="mt-3 text-[0.62rem] text-stone">
-                Reported by {booking.dispute.raisedByRole} ·{" "}
-                {formatDateTime(booking.dispute.createdAt)}
+                {t("app.reportedBy", {
+                  role: roleLabel(booking.dispute.raisedByRole),
+                })}{" "}
+                · {formatDateTime(booking.dispute.createdAt)}
               </p>
               <p className="mt-2 text-[0.65rem] leading-relaxed text-stone">
-                The original booking, work sessions, final bill and payment records are preserved.
+                {t("app.issuePreserved")}
               </p>
             </Card>
           ) : null}
 
           <Card className="p-4 sm:p-5">
-            <h2 className="font-display text-xl text-forest">Booking details</h2>
+            <h2 className="font-display text-xl text-forest">{t("app.bookingDetail")}</h2>
             <dl className="mt-3 space-y-2.5 text-xs">
               <div className="flex items-start justify-between gap-3 border-b border-line/60 pb-2.5">
                 <dt className="text-stone">{t("common.service")}</dt>
@@ -541,12 +560,12 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
                 <dt className="text-stone">{t("app.agreedRate")}</dt>
                 <dd className="text-right font-semibold text-forest">
                   {formatRupees(booking.agreedRate)}
-                  {PRICING_UNITS[booking.pricingType]}
+                  {pricingUnit}
                 </dd>
               </div>
               {booking.bookingFor === "other" ? (
                 <div className="flex items-start justify-between gap-3 border-b border-line/60 pb-2.5">
-                  <dt className="text-stone">Booked for</dt>
+                  <dt className="text-stone">{t("app.bookedFor")}</dt>
                   <dd className="text-right font-semibold text-forest">
                     {booking.recipientName}
                     <span className="block text-[0.62rem] font-normal text-stone">
@@ -565,7 +584,7 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
               ) : null}
               {booking.serviceLocation.note ? (
                 <div className="flex items-start justify-between gap-3">
-                  <dt className="text-stone">Farm note</dt>
+                  <dt className="text-stone">{t("app.farmNote")}</dt>
                   <dd className="max-w-[62%] text-right text-forest/85">
                     {booking.serviceLocation.note}
                   </dd>
@@ -575,9 +594,9 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
           </Card>
 
           <Card className="p-4 sm:p-5">
-            <h2 className="font-display text-xl text-forest">Status history</h2>
+            <h2 className="font-display text-xl text-forest">{t("app.statusHistory")}</h2>
             <p className="mt-1 text-xs text-stone">
-              Every change is recorded by the backend with who made it and why.
+              {t("app.statusHistoryBody")}
             </p>
             <div className="mt-3">
               <BookingHistory booking={booking} />
@@ -596,11 +615,11 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
                 <p className="truncate font-display text-xl text-forest">{otherParty.name}</p>
                 <p className="mt-0.5 text-[0.68rem] text-stone">
                   {isFarmer
-                    ? `Tractor owner · ${booking.ownerProfile.village}`
-                    : `Farmer · ${booking.serviceLocation.village}`}
+                    ? t("app.tractorOwnerVillage", { village: booking.ownerProfile.village })
+                    : t("app.farmerVillage", { village: booking.serviceLocation.village })}
                 </p>
                 <Badge tone={contactVisible ? "green" : "stone"} dot className="mt-1">
-                  {contactVisible ? "Contact available" : "Contact after acceptance"}
+                  {contactVisible ? t("app.contactAvailable") : t("app.contactAfterAcceptShort")}
                 </Badge>
               </div>
             </div>
@@ -627,7 +646,7 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
             {booking.bookingFor === "other" && contactVisible ? (
               <div className="mt-2 rounded-xl border border-clay/15 bg-clay/5 px-3.5 py-2.5">
                 <p className="text-[0.6rem] font-bold uppercase tracking-[0.12em] text-stone">
-                  Recipient
+                  {t("app.recipient")}
                 </p>
                 <p className="mt-0.5 text-xs font-semibold text-forest">
                   {booking.recipientName} · +91 {booking.recipientMobile}
@@ -636,8 +655,7 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
             ) : null}
             <p className="mt-3 flex items-start gap-1.5 text-[0.62rem] leading-relaxed text-stone">
               <MessageSquare className="mt-0.5 size-3 shrink-0" />
-              Use the number for work coordination only. Do not share bank OTPs, UPI PINs or
-              passwords with anyone.
+              {t("app.coordinationOnly")}
             </p>
           </Card>
 
@@ -645,10 +663,10 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
             <Card className="overflow-hidden">
               <div className="border-b border-line/80 bg-wheat/15 px-4 py-3">
                 <p className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-[#7a5a1d]">
-                  Pay {booking.owner.name} directly
+                  {t("app.payDirectly", { name: booking.owner.name })}
                 </p>
                 <p className="mt-0.5 text-[0.65rem] text-[#7a5a1d]">
-                  Pay outside KisanTractor, then record the method used.
+                  {t("app.payOutsideThenRecord")}
                 </p>
               </div>
               <div className="space-y-2 p-4">
@@ -660,7 +678,7 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
                           <p className="text-[0.6rem] font-bold uppercase tracking-[0.12em] text-stone">
                             {t("app.upiId")}
                           </p>
-                          <CopyButton value={paymentDetails.upiId} label="UPI ID" />
+                          <CopyButton value={paymentDetails.upiId} label={t("app.upiId")} />
                         </div>
                         <p className="mt-1 text-sm font-semibold text-forest">
                           {paymentDetails.upiId}
@@ -670,7 +688,7 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
                     {paymentDetails.shareQr && paymentDetails.qrImage ? (
                       <Photo
                         src={paymentDetails.qrImage}
-                        alt="Owner payment QR"
+                        alt={t("app.paymentQrAlt")}
                         className="mx-auto h-40 w-40 rounded-xl border border-line"
                         sizes="160px"
                       />
@@ -683,16 +701,18 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
                           </p>
                           <CopyButton
                             value={paymentDetails.bankAccountNumber}
-                            label="Account number"
+                            label={t("app.accountNumber")}
                           />
                         </div>
                         <p className="mt-1 text-xs font-semibold text-forest">
                           {paymentDetails.bankAccountName}
                         </p>
                         <p className="text-xs text-forest">
-                          A/c {paymentDetails.bankAccountNumber}
+                          {t("app.accountPrefix", { number: paymentDetails.bankAccountNumber })}
                         </p>
-                        <p className="text-[0.65rem] text-stone">IFSC {paymentDetails.bankIfsc}</p>
+                        <p className="text-[0.65rem] text-stone">
+                          {t("app.ifsc")} {paymentDetails.bankIfsc}
+                        </p>
                       </div>
                     ) : null}
                   </>
@@ -708,21 +728,21 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
 
           <div className="rounded-2xl border border-line/70 bg-paper/60 p-4">
             <p className="flex items-center gap-1.5 text-[0.62rem] font-bold uppercase tracking-[0.14em] text-stone">
-              <ReceiptText className="size-3.5" /> Booking record
+              <ReceiptText className="size-3.5" /> {t("app.bookingRecord")}
             </p>
             <div className="mt-2 space-y-1.5 text-[0.65rem] text-stone">
               <p className="flex items-center justify-between gap-2">
-                <span>Booking ID</span>
+                <span>{t("app.bookingId")}</span>
                 <span className="font-semibold text-forest">{booking.id}</span>
               </p>
               <p className="flex items-center justify-between gap-2">
-                <span>Requested</span>
+                <span>{t("app.requested")}</span>
                 <span className="font-semibold text-forest">
                   {formatDateTime(booking.createdAt)}
                 </span>
               </p>
               <p className="flex items-center justify-between gap-2">
-                <span>Last update</span>
+                <span>{t("app.lastUpdate")}</span>
                 <span className="font-semibold text-forest">
                   {formatDateTime(booking.updatedAt)}
                 </span>
@@ -732,11 +752,10 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
 
           <div className="rounded-2xl border border-forest/10 bg-forest/5 p-4">
             <p className="flex items-center gap-1.5 text-[0.62rem] font-bold uppercase tracking-[0.14em] text-forest">
-              <Wallet className="size-3.5" /> No commission
+              <Wallet className="size-3.5" /> {t("app.trustNoCommission")}
             </p>
             <p className="mt-1.5 text-[0.66rem] leading-relaxed text-forest/75">
-              KisanTractor holds no money and takes no commission. Farmers pay tractor owners
-              directly. The platform only records the booking, work and payment confirmation.
+              {t("app.noCommissionBody")}
             </p>
           </div>
         </aside>

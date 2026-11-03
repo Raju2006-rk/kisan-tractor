@@ -36,21 +36,10 @@ import {
   Select,
 } from "@/components/ui/primitives";
 import { useToast } from "@/components/providers/app-providers";
-import { LANGUAGES, VILLAGES } from "@/lib/constants";
+import { LANGUAGES } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 import type { Language, SessionUser } from "@/lib/types";
-import { cn, formatDate, haversineKm, maskMobile, reverseGeocode } from "@/lib/utils";
-
-/** Match a GPS reading to the closest known service village. */
-function nearestVillage(lat: number, lng: number) {
-  return VILLAGES.reduce((best, village) => {
-    const distance = haversineKm({ lat, lng }, village);
-    return distance < best.distance ? { village, distance } : best;
-  }, { village: VILLAGES[0], distance: Number.POSITIVE_INFINITY });
-}
-
-/** How far a GPS reading may be from a known village and still be saved. */
-const SERVICE_AREA_KM = 50;
+import { cn, formatDate, maskMobile, reverseGeocode } from "@/lib/utils";
 
 export function ProfileScreen({ user }: { user: SessionUser }) {
   const { t, language, setLanguage, roleLabel } = useI18n();
@@ -93,20 +82,6 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
   const dlVerified = Boolean(dlPhoto);
   const rcVerified = rcNumberValid || Boolean(rcPhoto);
   const documentsVerified = dlVerified || rcVerified;
-
-  function chooseVillage(name: string) {
-    setVillage(name);
-    setLocationNote(null);
-    setLocationError(null);
-    const match = VILLAGES.find(
-      (item) => item.name.toLowerCase() === name.trim().toLowerCase(),
-    );
-    if (match) {
-      setCoords({ lat: match.lat, lng: match.lng });
-      setDistrict(match.district);
-      setStateName(match.state);
-    }
-  }
 
   function useMyLocation() {
     setLocationError(null);

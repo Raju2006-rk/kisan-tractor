@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Alert, Button, Skeleton } from "@/components/ui/primitives";
 import { useToast } from "@/components/providers/app-providers";
+import { useI18n } from "@/lib/i18n";
 import type { BookingDetail, Role } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 
@@ -40,6 +41,7 @@ export function LiveLocationCard({
   onUpdated?: (booking: BookingDetail) => void;
 }) {
   const { push } = useToast();
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const watchRef = useRef<number | null>(null);
@@ -68,11 +70,11 @@ export function LiveLocationCard({
         error?: string;
         booking?: BookingDetail;
       };
-      if (!response.ok) throw new Error(data.error ?? "Could not update your location.");
+      if (!response.ok) throw new Error(data.error ?? t("app.couldNotUpdateLocation"));
       if (data.booking) onUpdated?.(data.booking);
       return data.booking;
     },
-    [booking.id, onUpdated],
+    [booking.id, onUpdated, t],
   );
 
   const publish = useCallback(
@@ -114,7 +116,7 @@ export function LiveLocationCard({
     setError(null);
     try {
       if (!navigator.geolocation) {
-        throw new Error("Your browser cannot share GPS location.");
+        throw new Error(t("app.browserCannotShareGps"));
       }
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -125,7 +127,7 @@ export function LiveLocationCard({
       });
       await publish(position, true);
       startWatch();
-      push("Live location shared with the tractor owner.", "success");
+      push(t("app.liveLocationShared"), "success");
     } catch (shareError) {
       const isGeoError =
         typeof shareError === "object" &&
@@ -133,10 +135,10 @@ export function LiveLocationCard({
         "code" in shareError &&
         "message" in shareError;
       const message = isGeoError
-        ? "Location permission was not given. Allow location access and try again."
+        ? t("app.locationPermissionNotGiven")
         : shareError instanceof Error
           ? shareError.message
-          : "Could not share your location.";
+          : t("app.couldNotShareLocation");
       setError(message);
     } finally {
       setBusy(false);
@@ -149,9 +151,13 @@ export function LiveLocationCard({
     try {
       stopWatch();
       await send({ sharing: false });
-      push("Live location sharing stopped.", "success");
+      push(t("app.locationSharingStopped"), "success");
     } catch (stopError) {
-      setError(stopError instanceof Error ? stopError.message : "Could not stop sharing.");
+      setError(
+        stopError instanceof Error
+          ? stopError.message
+          : t("app.couldNotStopSharing"),
+      );
     } finally {
       setBusy(false);
     }
@@ -166,10 +172,9 @@ export function LiveLocationCard({
             <Crosshair className="size-4" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-forest">Share live farm location</p>
+            <p className="text-sm font-semibold text-forest">{t("app.shareLiveFarmLocation")}</p>
             <p className="mt-0.5 text-[0.68rem] leading-relaxed text-stone">
-              The tractor owner can see your GPS position on a map only while you are sharing.
-              Stop at any time.
+              {t("app.shareLiveFarmLocationBody")}
             </p>
             {error ? (
               <Alert tone="danger" className="mt-2">
@@ -180,21 +185,23 @@ export function LiveLocationCard({
               {shared ? (
                 <>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-forest/10 px-2.5 py-1 text-[0.62rem] font-semibold text-forest">
-                    <Radio className="size-3 animate-pulse" /> Sharing live
+                    <Radio className="size-3 animate-pulse" /> {t("app.sharingLive")}
                   </span>
                   <Button variant="ghost" size="sm" onClick={stopSharing} loading={busy}>
-                    <Square className="size-3" /> Stop sharing
+                    <Square className="size-3" /> {t("app.stopSharing")}
                   </Button>
                 </>
               ) : (
                 <Button size="sm" onClick={startSharing} loading={busy}>
-                  <LocateFixed className="size-3.5" /> Share my current location
+                  <LocateFixed className="size-3.5" /> {t("app.shareMyCurrentLocation")}
                 </Button>
               )}
             </div>
             {shared && booking.farmerLocation ? (
               <p className="mt-1.5 text-[0.6rem] text-stone">
-                Updated {formatDateTime(booking.farmerLocation.updatedAt)}
+                {t("app.updatedAt", {
+                  date: formatDateTime(booking.farmerLocation.updatedAt),
+                })}
                 {booking.farmerLocation.accuracy
                   ? ` · ±${Math.round(booking.farmerLocation.accuracy)} m`
                   : ""}
@@ -202,8 +209,7 @@ export function LiveLocationCard({
             ) : null}
             <p className="mt-2 flex items-start gap-1.5 text-[0.6rem] leading-relaxed text-stone">
               <ShieldCheck className="mt-0.5 size-3 shrink-0 text-forest" />
-              Your location is shared only with this booking’s tractor owner and is removed when
-              you stop sharing.
+              {t("app.locationSharedOnlyWithOwner")}
             </p>
           </div>
         </div>
@@ -222,11 +228,11 @@ export function LiveLocationCard({
             <Navigation className="size-4" />
           </span>
           <div>
-            <p className="text-sm font-semibold text-forest">Track farmer & farm land</p>
+            <p className="text-sm font-semibold text-forest">{t("app.trackFarmerFarm")}</p>
             <p className="mt-0.5 text-[0.68rem] leading-relaxed text-stone">
               {live
-                ? "The farmer is sharing live GPS for this booking."
-                : "Live GPS is not shared yet. The farm address is still shown on the map."}
+                ? t("app.farmerSharingLive")
+                : t("app.liveGpsNotShared")}
             </p>
           </div>
         </div>
@@ -236,7 +242,7 @@ export function LiveLocationCard({
           rel="noreferrer"
           className="inline-flex items-center gap-1 rounded-lg border border-forest/20 bg-paper px-2.5 py-1.5 text-[0.62rem] font-semibold text-forest transition hover:border-forest/40"
         >
-          <ExternalLink className="size-3" /> Go to farm land
+          <ExternalLink className="size-3" /> {t("app.goToFarmLand")}
         </a>
       </div>
 
@@ -258,11 +264,11 @@ export function LiveLocationCard({
         </span>
         {live ? (
           <span className="inline-flex items-center gap-1 font-semibold text-clay-dark">
-            <Radio className="size-3 animate-pulse" /> Live · {formatDateTime(live.updatedAt)}
+            <Radio className="size-3 animate-pulse" /> {t("app.liveLabel")} · {formatDateTime(live.updatedAt)}
             {live.accuracy ? ` · ±${Math.round(live.accuracy)} m` : ""}
           </span>
         ) : (
-          <span>Ask the farmer to share live location from their booking screen.</span>
+          <span>{t("app.askFarmerShareLocation")}</span>
         )}
       </div>
     </div>

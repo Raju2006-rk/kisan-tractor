@@ -37,12 +37,9 @@ import { EQUIPMENT_CATALOG, VILLAGES } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 import { formatRupees } from "@/lib/pricing";
 import type { SessionUser, TractorWithOwner } from "@/lib/types";
-import { cn, haversineKm, reverseGeocode } from "@/lib/utils";
+import { cn, reverseGeocode } from "@/lib/utils";
 
 type TractorStatus = "active" | "maintenance" | "inactive";
-
-/** How far a GPS reading may be from a known village and still be adopted. */
-const SERVICE_AREA_KM = 50;
 
 type TractorForm = {
   id?: string;
@@ -114,7 +111,7 @@ function formFromTractor(tractor: TractorWithOwner): TractorForm {
 }
 
 export function OwnerTractorScreen({ user }: { user: SessionUser }) {
-  const { t } = useI18n();
+  const { t, equipmentLabel, equipmentDescription } = useI18n();
   const { push } = useToast();
   const statusLabel = (status: TractorStatus) => {
     if (status === "maintenance") return t("app.underMaintenanceLabel");
@@ -733,10 +730,10 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
                     </span>
                     <span>
                       <span className="block text-sm font-semibold text-forest">
-                        {equipment.name}
+                        {equipmentLabel(equipment.id, equipment.name)}
                       </span>
                       <span className="mt-0.5 block text-[0.64rem] leading-relaxed text-stone">
-                        {equipment.description}
+                        {equipmentDescription(equipment.id, equipment.description)}
                       </span>
                     </span>
                   </button>

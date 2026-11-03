@@ -29,12 +29,12 @@ import { cn, formatDateTime } from "@/lib/utils";
 
 const TYPE_META: Record<
   Notification["type"],
-  { icon: typeof Bell; tone: string; label: string }
+  { icon: typeof Bell; tone: string }
 > = {
-  booking: { icon: CalendarDays, tone: "bg-forest/8 text-forest", label: "Booking" },
-  payment: { icon: HandCoins, tone: "bg-wheat/40 text-[#7a5a1d]", label: "Payment" },
-  work: { icon: Tractor, tone: "bg-sky/10 text-sky", label: "Work" },
-  system: { icon: Info, tone: "bg-sand/70 text-stone", label: "Update" },
+  booking: { icon: CalendarDays, tone: "bg-forest/8 text-forest" },
+  payment: { icon: HandCoins, tone: "bg-wheat/40 text-[#7a5a1d]" },
+  work: { icon: Tractor, tone: "bg-sky/10 text-sky" },
+  system: { icon: Info, tone: "bg-sand/70 text-stone" },
 };
 
 export function NotificationsScreen() {
@@ -42,6 +42,14 @@ export function NotificationsScreen() {
   const { push } = useToast();
   const router = useRouter();
   const { mutate: globalMutate } = useSWRConfig();
+  const typeLabel = (type: Notification["type"]) =>
+    type === "booking"
+      ? t("app.typeBooking")
+      : type === "payment"
+        ? t("app.typePayment")
+        : type === "work"
+          ? t("app.typeWork")
+          : t("app.typeUpdate");
   const { data, isLoading, mutate } = useSWR<{
     notifications: Notification[];
     unread: number;
@@ -57,13 +65,18 @@ export function NotificationsScreen() {
         body: JSON.stringify(ids ? { ids } : {}),
       });
       const result = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Could not update notifications.");
+      if (!response.ok) throw new Error(result.error ?? t("app.couldNotUpdateNotifications"));
       await mutate();
       await globalMutate(
         (key) => typeof key === "string" && key.startsWith("/api/notifications"),
       );
     } catch (error) {
-      push(error instanceof Error ? error.message : "Could not update notifications.", "error");
+      push(
+        error instanceof Error
+          ? error.message
+          : t("app.couldNotUpdateNotifications"),
+        "error",
+      );
     }
   }
 
@@ -80,7 +93,7 @@ export function NotificationsScreen() {
             <Badge tone="green" dot>{t("app.notificationsTitle")}</Badge>
             {unread > 0 ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-clay/10 px-2 py-1 text-[0.62rem] font-semibold text-clay-dark">
-                <BellRing className="size-3" /> {unread} unread
+                <BellRing className="size-3" /> {t("app.unreadCount", { count: unread })}
               </span>
             ) : null}
           </div>
@@ -108,10 +121,10 @@ export function NotificationsScreen() {
         <EmptyState
           icon={<Bell className="size-5" />}
           title={t("app.noNotifications")}
-          body="Booking requests, work updates and payment confirmations will appear here."
+          body={t("app.notificationsEmptyBody")}
           action={
             <Link href="/bookings" className={buttonStyles("outline", "sm")}>
-              View bookings
+              {t("app.viewBookings")}
             </Link>
           }
         />
@@ -141,7 +154,7 @@ export function NotificationsScreen() {
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-1.5">
                     <span className="text-[0.58rem] font-bold uppercase tracking-[0.12em] text-stone/60">
-                      {meta.label}
+                      {typeLabel(notification.type)}
                     </span>
                     {!notification.read ? (
                       <span className="size-1.5 rounded-full bg-clay" />
@@ -159,7 +172,7 @@ export function NotificationsScreen() {
                 </span>
                 {notification.bookingId ? (
                   <span className="mt-1 shrink-0 text-[0.62rem] font-semibold text-clay">
-                    Open →
+                    {t("app.open")} →
                   </span>
                 ) : !notification.read ? (
                   <span className="mt-1 flex size-6 shrink-0 items-center justify-center rounded-full border border-line text-stone">
@@ -179,7 +192,7 @@ export function NotificationsScreen() {
           </span>
           <div>
             <p className="text-sm font-semibold text-forest">
-              Payment reminders are informational only.
+              {t("app.paymentRemindersInfo")}
             </p>
             <p className="mt-0.5 max-w-2xl text-[0.7rem] leading-relaxed text-stone">
               {t("common.directPayment")} {t("app.onlyOwnerConfirm")}
@@ -187,7 +200,7 @@ export function NotificationsScreen() {
           </div>
         </div>
         <Link href="/help#billing" className={buttonStyles("outline", "sm", "shrink-0")}>
-          Billing help
+          {t("app.billingHelp")}
         </Link>
       </div>
     </div>

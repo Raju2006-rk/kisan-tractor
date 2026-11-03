@@ -35,7 +35,7 @@ import {
   buttonStyles,
 } from "@/components/ui/primitives";
 import { useToast } from "@/components/providers/app-providers";
-import { PRICING_LABELS, PRICING_UNITS, SERVICES, VILLAGES } from "@/lib/constants";
+import { SERVICES, VILLAGES } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 import { calculateAmount, formatRupees, minutesToHoursLabel } from "@/lib/pricing";
 import type {
@@ -75,17 +75,15 @@ const pricingIcons: Record<PricingType, typeof Clock3> = {
   trip: Truck,
 };
 
-/** How far a GPS reading may be from a known village and still be named. */
-const SERVICE_AREA_KM = 50;
-
 const steps = [
-  { title: "Tractor", hint: "Choose the machine" },
-  { title: "Work", hint: "Service, rate & time" },
-  { title: "Location", hint: "Where & for whom" },
-  { title: "Review", hint: "Send the request" },
-];
+  { title: "app.stepTractor", hint: "app.stepTractorHint" },
+  { title: "app.stepWork", hint: "app.stepWorkHint" },
+  { title: "app.stepLocation", hint: "app.stepLocationHint" },
+  { title: "app.stepReview", hint: "app.stepReviewHint" },
+] as const;
 
 function Stepper({ step }: { step: number }) {
+  const { t } = useI18n();
   return (
     <ol className="grid grid-cols-4 gap-1.5">
       {steps.map((item, index) => {
@@ -118,10 +116,10 @@ function Stepper({ step }: { step: number }) {
                     active ? "text-forest" : done ? "text-forest/75" : "text-stone/70",
                   )}
                 >
-                  {item.title}
+                  {t(item.title)}
                 </span>
                 <span className="hidden truncate text-[0.56rem] text-stone/60 sm:block">
-                  {item.hint}
+                  {t(item.hint)}
                 </span>
               </span>
             </div>
@@ -141,6 +139,7 @@ function TractorChoice({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <button
       type="button"
@@ -180,17 +179,20 @@ function TractorChoice({
         <div className="mt-1.5 flex flex-wrap gap-1">
           {tractor.pricing.hourlyEnabled ? (
             <span className="rounded-md bg-cream px-1.5 py-0.5 text-[0.6rem] font-semibold text-forest">
-              {formatRupees(tractor.pricing.hourlyRate)}/hr
+              {formatRupees(tractor.pricing.hourlyRate)}
+              {t("common.perHour")}
             </span>
           ) : null}
           {tractor.pricing.acreEnabled ? (
             <span className="rounded-md bg-cream px-1.5 py-0.5 text-[0.6rem] font-semibold text-forest">
-              {formatRupees(tractor.pricing.acreRate)}/acre
+              {formatRupees(tractor.pricing.acreRate)}
+              {t("common.perAcre")}
             </span>
           ) : null}
           {tractor.pricing.tripEnabled ? (
             <span className="rounded-md bg-cream px-1.5 py-0.5 text-[0.6rem] font-semibold text-forest">
-              {formatRupees(tractor.pricing.tripRate)}/trip
+              {formatRupees(tractor.pricing.tripRate)}
+              {t("common.perTrip")}
             </span>
           ) : null}
         </div>
@@ -215,6 +217,18 @@ export function BookingWizard({
   const { mutate } = useSWRConfig();
   const { push } = useToast();
   const { t, serviceLabel } = useI18n();
+  const pricingLabel = (option: PricingType) =>
+    option === "hourly"
+      ? t("app.hourly")
+      : option === "acre"
+        ? t("app.perAcre")
+        : t("app.perTrip");
+  const pricingUnit = (option: PricingType) =>
+    option === "hourly"
+      ? t("common.perHour")
+      : option === "acre"
+        ? t("common.perAcre")
+        : t("common.perTrip");
   const [step, setStep] = useState(initialTractorId ? 1 : 0);
   const [tractorId, setTractorId] = useState(initialTractorId ?? "");
   const [serviceType, setServiceType] = useState<ServiceType>("ploughing");
@@ -334,13 +348,11 @@ export function BookingWizard({
   function useMyLocation() {
     setError(null);
     if (typeof window !== "undefined" && !window.isSecureContext) {
-      setError(
-        "Location sharing needs a secure https connection. Choose your village instead.",
-      );
+      setError(t("app.locationSecureRequired"));
       return;
     }
     if (!navigator.geolocation) {
-      setError("Your browser cannot share location. Choose your village instead.");
+      setError(t("app.browserCannotShareLocation"));
       return;
     }
     setLocating(true);
@@ -356,12 +368,12 @@ export function BookingWizard({
           if (geo.address) setFarmLabel(geo.address);
           push(
             geo.village
-              ? `Location auto-detected: ${geo.village}`
-              : "Location coordinates captured from device.",
+              ? t("app.wizardLocationDetected", { village: geo.village })
+              : t("app.wizardLocationCaptured"),
             "success",
           );
         } catch {
-          push("Location coordinates captured from device.", "info");
+          push(t("app.wizardLocationCaptured"), "info");
         } finally {
           setLocating(false);
         }
@@ -370,10 +382,10 @@ export function BookingWizard({
         setLocating(false);
         setError(
           positionError.code === positionError.PERMISSION_DENIED
-            ? "Location permission is blocked. Allow location for this site, or choose your village instead."
+            ? t("app.wizardLocationBlocked")
             : positionError.code === positionError.TIMEOUT
-              ? "Location took too long. Try again, or choose your village instead."
-              : "Could not read your location. Choose your village instead.",
+              ? t("app.wizardLocationTimeout")
+              : t("app.wizardLocationCouldNotRead"),
         );
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
@@ -382,45 +394,44 @@ export function BookingWizard({
 
   function validateStep(current: number): string | null {
     if (current === 0) {
-      if (!selectedTractor) return "Please choose a tractor.";
-      if (!selectedTractor.isAvailable)
-        return "This owner is offline for new requests. Choose another tractor.";
+      if (!selectedTractor) return t("app.chooseTractorError");
+      if (!selectedTractor.isAvailable) return t("app.ownerOfflineError");
     }
     if (current === 1) {
-      if (!selectedTractor) return "Please choose a tractor.";
+      if (!selectedTractor) return t("app.chooseTractorError");
       if (!supportedServices.some((service) => service.id === serviceType))
-        return "This tractor does not have the equipment for that work.";
+        return t("app.equipmentError");
       if (!enabledPricing.includes(pricingType))
-        return "Choose an available pricing option.";
+        return t("app.pricingOptionError");
       if (pricingType === "hourly") {
         if (!Number.isFinite(minutes) || minutes < 30 || minutes > 12 * 60)
-          return "Enter an estimated time between 30 minutes and 12 hours.";
+          return t("app.hoursError");
       }
       if (pricingType === "acre") {
         if (!Number.isFinite(acresValue) || acresValue <= 0 || acresValue > 100)
-          return "Enter an acreage between 0 and 100.";
+          return t("app.acresError");
       }
       if (pricingType === "trip") {
         if (!Number.isFinite(tripsValue) || tripsValue < 1 || tripsValue > 20)
-          return "Choose between 1 and 20 trips.";
+          return t("app.tripsError");
       }
-      if (!date || date < todayISO()) return "Choose today or a future date.";
-      if (!/^\d{2}:\d{2}$/.test(time)) return "Choose a valid start time.";
+      if (!date || date < todayISO()) return t("app.dateError");
+      if (!/^\d{2}:\d{2}$/.test(time)) return t("app.timeError");
       if (date === todayISO()) {
         const now = new Date();
         if (timeToMinutes(time) < now.getHours() * 60 + now.getMinutes() + 30) {
-          return "For today, choose a start time at least 30 minutes from now.";
+          return t("app.todayTimeError");
         }
       }
     }
     if (current === 2) {
       if (bookingFor === "other") {
-        if (!recipientName.trim()) return "Please enter the recipient’s name.";
+        if (!recipientName.trim()) return t("app.recipientNameError");
         if (!/^[6-9]\d{9}$/.test(recipientMobile.replace(/\D/g, "")))
-          return "Please enter a valid 10-digit recipient mobile number.";
+          return t("app.recipientMobileError");
       }
-      if (!farmLabel.trim()) return "Add the farm address or a landmark.";
-      if (!villageName.trim()) return "Choose or type the service village.";
+      if (!farmLabel.trim()) return t("app.farmAddressError");
+      if (!villageName.trim()) return t("app.villageError");
     }
     return null;
   }
@@ -474,9 +485,9 @@ export function BookingWizard({
         }),
       });
       const data = (await response.json()) as { error?: string; booking?: BookingDetail };
-      if (!response.ok) throw new Error(data.error ?? "Could not send this booking request.");
+      if (!response.ok) throw new Error(data.error ?? t("app.couldNotSendBooking"));
       setCreated(data.booking ?? null);
-      push("Booking request sent to the owner.", "success");
+      push(t("app.bookingRequestSent"), "success");
       await mutate(
         (key) => typeof key === "string" && key.startsWith("/api/"),
         undefined,
@@ -487,7 +498,7 @@ export function BookingWizard({
       setError(
         submitError instanceof Error
           ? submitError.message
-          : "Could not send this booking request.",
+          : t("app.couldNotSendBooking"),
       );
     } finally {
       setSubmitting(false);
@@ -546,14 +557,16 @@ export function BookingWizard({
               </div>
               {created.bookingFor === "other" ? (
                 <p className="mt-2 text-[0.68rem] text-clay-dark">
-                  Booked for {created.recipientName} · {created.recipientMobile}
+                  {t("app.bookedForPerson", {
+                    name: created.recipientName ?? "",
+                    mobile: created.recipientMobile ?? "",
+                  })}
                 </p>
               ) : null}
             </div>
 
             <Alert tone="info" title={t("app.noPaymentNow")}>
-              The owner must accept before the work is scheduled. You will see the update in
-              Bookings. Payment is always made directly to the owner after the final bill.
+              {t("app.requestSentNote")}
             </Alert>
 
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -580,27 +593,27 @@ export function BookingWizard({
           href={selectedTractor ? `/tractors/${selectedTractor.id}` : "/explore"}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone transition hover:text-forest"
         >
-          <ArrowLeft className="size-3.5" /> {selectedTractor ? "Back to tractor" : "Back to explore"}
+          <ArrowLeft className="size-3.5" />{" "}
+          {selectedTractor ? t("app.backToTractor") : t("app.backToExplore")}
         </Link>
         <span className="inline-flex items-center gap-1.5 text-[0.65rem] font-semibold text-stone/70">
-          <ShieldCheck className="size-3.5 text-moss" /> No payment now · Owner confirms first
+          <ShieldCheck className="size-3.5 text-moss" /> {t("app.noPaymentNowShort")}
         </span>
       </div>
 
       <div>
-        <span className="eyebrow">Book farm work</span>
+        <span className="eyebrow">{t("app.bookFarmWork")}</span>
         <h1 className="mt-2 font-display text-3xl text-forest sm:text-[2.4rem]">
           {step === 0
-            ? "Choose a tractor near your farm."
+            ? t("app.wizardTitleTractor")
             : step === 1
-              ? "Choose the work and the rate."
+              ? t("app.wizardTitleWork")
               : step === 2
-                ? "Where is the work, and who is it for?"
-                : "Review before you send."}
+                ? t("app.wizardTitleLocation")
+                : t("app.wizardTitleReview")}
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-stone">
-          The rate you choose is saved with the request. The final bill uses actual active work or
-          measured work, and you pay the owner directly.
+          {t("app.wizardIntro")}
         </p>
       </div>
 
@@ -617,9 +630,9 @@ export function BookingWizard({
           {step === 0 ? (
             <div className="space-y-4">
               <div>
-                <h2 className="font-display text-xl text-forest">Available tractors</h2>
+                <h2 className="font-display text-xl text-forest">{t("app.availableTractors")}</h2>
                 <p className="mt-1 text-xs text-stone">
-                  These owners are online and can receive a request now.
+                  {t("app.availableTractorsBody")}
                 </p>
               </div>
               {listLoading ? (
@@ -631,12 +644,12 @@ export function BookingWizard({
               ) : tractors.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-line p-6 text-center">
                   <TractorIcon className="mx-auto size-7 text-stone/50" />
-                  <p className="mt-2 font-display text-lg text-forest">No tractors online now</p>
+                  <p className="mt-2 font-display text-lg text-forest">{t("app.noTractorsOnline")}</p>
                   <p className="mt-1 text-xs text-stone">
-                    Check again later or ask a local owner directly.
+                    {t("app.noTractorsOnlineBody")}
                   </p>
                   <Link href="/explore" className={buttonStyles("outline", "sm", "mt-3")}>
-                    Back to explore
+                    {t("app.backToExplore")}
                   </Link>
                 </div>
               ) : (
@@ -682,7 +695,7 @@ export function BookingWizard({
                     onClick={() => setStep(0)}
                     className="shrink-0 text-[0.65rem] font-semibold text-clay hover:underline"
                   >
-                    Change
+                    {t("app.change")}
                   </button>
                 ) : null}
               </div>
@@ -718,7 +731,7 @@ export function BookingWizard({
                             {serviceLabel(service.id)}
                           </span>
                           <span className="mt-0.5 block text-[0.64rem] leading-relaxed text-stone">
-                            {service.short}
+                            {t(`serviceShort.${service.id}` as Parameters<typeof t>[0])}
                           </span>
                         </span>
                       </button>
@@ -756,12 +769,12 @@ export function BookingWizard({
                           {active ? <Check className="size-3.5 text-forest" /> : null}
                         </span>
                         <span className="mt-2 block text-xs font-semibold text-forest">
-                          {PRICING_LABELS[option]}
+                          {pricingLabel(option)}
                         </span>
                         <span className="mt-0.5 block font-display text-lg text-forest">
                           {formatRupees(optionRate)}
                           <span className="text-[0.6rem] font-normal text-stone">
-                            {PRICING_UNITS[option]}
+                            {pricingUnit(option)}
                           </span>
                         </span>
                       </button>
@@ -772,8 +785,8 @@ export function BookingWizard({
 
               {pricingType === "hourly" ? (
                 <Field
-                  label="How long do you expect the work to take?"
-                  hint="Only active time is billed"
+                  label={t("app.hoursQuestion")}
+                  hint={t("app.hoursHint")}
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     {["1", "2", "3", "4", "6"].map((value) => (
@@ -788,7 +801,7 @@ export function BookingWizard({
                             : "border-line bg-paper text-stone hover:border-forest/25",
                         )}
                       >
-                        {value} hr
+                        {value} {t("common.hrShort")}
                       </button>
                     ))}
                     <div className="flex items-center gap-1.5">
@@ -801,17 +814,19 @@ export function BookingWizard({
                         onChange={(event) => setHours(event.target.value)}
                         className="h-9 w-20 text-xs"
                       />
-                      <span className="text-xs text-stone">hours</span>
+                      <span className="text-xs text-stone">{t("common.hours")}</span>
                     </div>
                   </div>
                   <p className="mt-1 text-[0.65rem] text-stone">
-                    {minutesToHoursLabel(Math.max(0, minutes))} estimated · breaks are not billed.
+                    {t("app.hoursEstimate", {
+                      time: minutesToHoursLabel(Math.max(0, minutes)),
+                    })}
                   </p>
                 </Field>
               ) : pricingType === "acre" ? (
                 <Field
-                  label="How many acres need work?"
-                  hint={`Rate ${formatRupees(selectedTractor.pricing.acreRate)} / acre`}
+                  label={t("app.acresQuestion")}
+                  hint={`${t("app.agreedRate")} ${formatRupees(selectedTractor.pricing.acreRate)}${t("common.perAcre")}`}
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     {["1", "2", "3", "5"].map((value) => (
@@ -826,7 +841,7 @@ export function BookingWizard({
                             : "border-line bg-paper text-stone hover:border-forest/25",
                         )}
                       >
-                        {value} acre
+                        {value} {t("common.acreShort")}
                       </button>
                     ))}
                     <div className="flex items-center gap-1.5">
@@ -839,14 +854,14 @@ export function BookingWizard({
                         onChange={(event) => setAcres(event.target.value)}
                         className="h-9 w-20 text-xs"
                       />
-                      <span className="text-xs text-stone">acres</span>
+                      <span className="text-xs text-stone">{t("common.acres")}</span>
                     </div>
                   </div>
                 </Field>
               ) : (
                 <Field
-                  label="How many trips do you need?"
-                  hint={`Rate ${formatRupees(selectedTractor.pricing.tripRate)} / trip`}
+                  label={t("app.tripsQuestion")}
+                  hint={`${t("app.agreedRate")} ${formatRupees(selectedTractor.pricing.tripRate)}${t("common.perTrip")}`}
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     {["1", "2", "3", "4"].map((value) => (
@@ -861,7 +876,7 @@ export function BookingWizard({
                             : "border-line bg-paper text-stone hover:border-forest/25",
                         )}
                       >
-                        {value} trip
+                        {value} {t("common.tripShort")}
                       </button>
                     ))}
                     <div className="flex items-center gap-1.5">
@@ -874,7 +889,7 @@ export function BookingWizard({
                         onChange={(event) => setTrips(event.target.value)}
                         className="h-9 w-20 text-xs"
                       />
-                      <span className="text-xs text-stone">trips</span>
+                      <span className="text-xs text-stone">{t("common.trips")}</span>
                     </div>
                   </div>
                 </Field>
@@ -899,8 +914,7 @@ export function BookingWizard({
               </div>
               <p className="flex items-start gap-2 text-[0.68rem] leading-relaxed text-stone">
                 <Info className="mt-0.5 size-3.5 shrink-0" />
-                For today, choose a start time at least 30 minutes from now. The owner may suggest
-                a different time if the tractor is already booked.
+                {t("app.todayTimeHint")}
               </p>
 
               <div className="flex items-center justify-between rounded-2xl bg-forest/5 px-4 py-3">
@@ -909,8 +923,8 @@ export function BookingWizard({
                     {t("app.estimate")}
                   </p>
                   <p className="text-[0.65rem] text-stone">
-                    {PRICING_LABELS[pricingType]} · {formatRupees(rate)}
-                    {PRICING_UNITS[pricingType]}
+                    {pricingLabel(pricingType)} · {formatRupees(rate)}
+                    {pricingUnit(pricingType)}
                   </p>
                 </div>
                 <p className="font-display text-2xl text-forest">{formatRupees(estimate)}</p>
@@ -939,7 +953,7 @@ export function BookingWizard({
                         {t("app.myself")}
                       </span>
                       <span className="mt-0.5 block text-[0.64rem] text-stone">
-                        Work on my own farm
+                        {t("app.workOnOwnFarm")}
                       </span>
                     </span>
                   </button>
@@ -959,7 +973,7 @@ export function BookingWizard({
                         {t("app.someoneElse")}
                       </span>
                       <span className="mt-0.5 block text-[0.64rem] text-stone">
-                        For family · no account needed
+                        {t("app.forFamilyNoAccount")}
                       </span>
                     </span>
                   </button>
@@ -1004,19 +1018,19 @@ export function BookingWizard({
                     className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[0.65rem] font-semibold text-forest transition hover:border-forest/30 disabled:opacity-60"
                   >
                     <LocateFixed className={cn("size-3.5", locating && "animate-spin")} />
-                    {locating ? "Locating…" : t("common.useMyLocation")}
+                    {locating ? t("app.locating") : t("common.useMyLocation")}
                   </button>
                 </div>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2">
                   <Field
                     label={t("app.village")}
                     required
-                    hint="Type the village name. We fill the map location when it matches a known village, or use your current location."
+                    hint={t("app.villageMapHint")}
                   >
                     <Input
                       value={villageName}
                       onChange={(event) => chooseVillage(event.target.value)}
-                      placeholder="Type your village name"
+                      placeholder={t("app.villagePlaceholder")}
                       autoComplete="address-level2"
                     />
                   </Field>
@@ -1024,7 +1038,7 @@ export function BookingWizard({
                     <Input
                       value={farmLabel}
                       onChange={(event) => setFarmLabel(event.target.value)}
-                      placeholder="Patil farm, near the water tank"
+                      placeholder={t("app.farmAddressPlaceholder")}
                     />
                   </Field>
                 </div>
@@ -1042,21 +1056,20 @@ export function BookingWizard({
                 <Textarea
                   value={note}
                   onChange={(event) => setNote(event.target.value)}
-                  placeholder="Please use the east-side farm entrance. The crop is onion."
+                  placeholder={t("app.noteOwnerPlaceholder")}
                   maxLength={500}
                 />
               </Field>
 
               <Alert tone="info">
-                Contact details are shared with the owner after the booking is accepted. The owner
-                uses the location and note to reach your field.
+                {t("app.contactSharedAfterAcceptWizard")}
               </Alert>
             </div>
           ) : null}
 
           {step === 3 && selectedTractor ? (
             <div className="space-y-4">
-              <h2 className="font-display text-xl text-forest">Booking review</h2>
+              <h2 className="font-display text-xl text-forest">{t("app.bookingReview")}</h2>
               <div className="rounded-2xl border border-line bg-cream/40 p-4">
                 <div className="flex items-center gap-3">
                   <Photo
@@ -1078,14 +1091,14 @@ export function BookingWizard({
                   <div className="flex items-start justify-between gap-3">
                     <dt className="text-stone">{t("common.service")}</dt>
                     <dd className="text-right font-semibold text-forest">
-                      {serviceLabel(serviceType)} · {PRICING_LABELS[pricingType]}
+                      {serviceLabel(serviceType)} · {pricingLabel(pricingType)}
                     </dd>
                   </div>
                   <div className="flex items-start justify-between gap-3">
                     <dt className="text-stone">{t("app.agreedRate")}</dt>
                     <dd className="text-right font-semibold text-forest">
                       {formatRupees(rate)}
-                      {PRICING_UNITS[pricingType]}
+                      {pricingUnit(pricingType)}
                     </dd>
                   </div>
                   <div className="flex items-start justify-between gap-3">
@@ -1094,8 +1107,8 @@ export function BookingWizard({
                       {pricingType === "hourly"
                         ? minutesToHoursLabel(Math.max(0, minutes))
                         : pricingType === "acre"
-                          ? `${acresValue} acres`
-                          : `${tripsValue} trips`}
+                          ? t("app.acresCount", { count: acresValue })
+                          : t("app.tripsCount", { count: tripsValue })}
                     </dd>
                   </div>
                   <div className="flex items-start justify-between gap-3">
@@ -1112,7 +1125,7 @@ export function BookingWizard({
                   </div>
                   {bookingFor === "other" ? (
                     <div className="flex items-start justify-between gap-3">
-                      <dt className="text-stone">For</dt>
+                      <dt className="text-stone">{t("app.forLabel")}</dt>
                       <dd className="text-right font-semibold text-forest">
                         {recipientName} · ••••••{mobileEnding(recipientMobile)}
                       </dd>
@@ -1149,8 +1162,7 @@ export function BookingWizard({
                   className="mt-0.5 size-4 accent-[#163b2a]"
                 />
                 <span>
-                  I understand this is a request, not a confirmed booking. The owner must accept
-                  before work is scheduled, and I will pay the owner directly after the final bill.
+                  {t("app.agreeRequestNotConfirmed")}
                 </span>
               </label>
             </div>
@@ -1233,7 +1245,7 @@ export function BookingWizard({
                   </div>
                 </>
               ) : (
-                <p className="text-stone">Choose a tractor to see the summary.</p>
+                <p className="text-stone">{t("app.chooseTractorSummary")}</p>
               )}
             </div>
             <div className="border-t border-line/80 px-4 py-3">
@@ -1246,36 +1258,37 @@ export function BookingWizard({
 
           <div className="rounded-2xl border border-line/70 bg-paper/60 p-4">
             <p className="flex items-center gap-1.5 text-[0.62rem] font-bold uppercase tracking-[0.14em] text-stone">
-              <ShieldCheck className="size-3.5 text-moss" /> What happens next?
+              <ShieldCheck className="size-3.5 text-moss" /> {t("app.whatHappensNext")}
             </p>
             <ol className="mt-2.5 space-y-2 text-[0.66rem] leading-relaxed text-stone">
               <li className="flex gap-2">
                 <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-forest/10 text-[0.55rem] font-bold text-forest">
                   1
                 </span>
-                The owner accepts or declines your request.
+                {t("app.nextStepAccept")}
               </li>
               <li className="flex gap-2">
                 <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-forest/10 text-[0.55rem] font-bold text-forest">
                   2
                 </span>
-                Work starts and active time or measurement is recorded.
+                {t("app.nextStepWork")}
               </li>
               <li className="flex gap-2">
                 <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-forest/10 text-[0.55rem] font-bold text-forest">
                   3
                 </span>
-                You review the final bill and pay the owner directly.
+                {t("app.nextStepPay")}
               </li>
             </ol>
           </div>
 
           <div className="flex items-center justify-between rounded-2xl border border-line/70 bg-paper/60 px-3.5 py-2.5">
             <span className="inline-flex items-center gap-1.5 text-[0.65rem] font-semibold text-forest">
-              <Compass className="size-3.5" /> Booked by {user.name.split(" ")[0]}
+              <Compass className="size-3.5" />{" "}
+              {t("app.bookedByShort", { name: user.name.split(" ")[0] })}
             </span>
             <Link href="/explore" className="text-[0.62rem] font-semibold text-clay hover:underline">
-              Change tractor
+              {t("app.changeTractor")}
             </Link>
           </div>
         </aside>

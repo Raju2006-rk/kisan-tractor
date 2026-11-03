@@ -147,14 +147,14 @@ export function BookingActions({
         error?: string;
         booking?: BookingDetail;
       };
-      if (!response.ok) throw new Error(data.error ?? "Could not update this booking.");
-      push("Booking updated.", "success");
+      if (!response.ok) throw new Error(data.error ?? t("app.couldNotUpdateBooking"));
+      push(t("app.bookingUpdated"), "success");
       setDialog(null);
       await mutate((key) => typeof key === "string" && key.startsWith("/api/"));
       if (data.booking) onUpdated?.(data.booking);
       router.refresh();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Could not update this booking.");
+      setError(submitError instanceof Error ? submitError.message : t("app.couldNotUpdateBooking"));
     } finally {
       setLoading(false);
     }
@@ -254,7 +254,12 @@ export function BookingActions({
           <div className="flex items-center justify-between">
             <span className="text-stone">{t("app.agreedRate")}</span>
             <span className="font-semibold text-forest">
-              {formatRupees(booking.agreedRate)} / {booking.pricingType === "hourly" ? "hour" : booking.pricingType}
+              {formatRupees(booking.agreedRate)}
+              {booking.pricingType === "hourly"
+                ? t("common.perHour")
+                : booking.pricingType === "acre"
+                  ? t("common.perAcre")
+                  : t("common.perTrip")}
             </span>
           </div>
         </div>
@@ -274,7 +279,11 @@ export function BookingActions({
             <Button
               variant="danger"
               loading={loading}
-              onClick={() => submit("reject", { reason: reason || "Owner unavailable for this booking" })}
+              onClick={() =>
+              submit("reject", {
+                reason: reason || t("app.ownerUnavailableReason"),
+              })
+            }
             >
               {t("app.yesReject")}
             </Button>
@@ -285,7 +294,7 @@ export function BookingActions({
           <Textarea
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            placeholder="Tractor already committed for another job"
+            placeholder={t("app.tractorCommittedPlaceholder")}
           />
         </Field>
         {error ? <Alert tone="danger" className="mt-3">{error}</Alert> : null}
@@ -304,7 +313,11 @@ export function BookingActions({
             <Button
               variant="danger"
               loading={loading}
-              onClick={() => submit("cancel", { reason: reason || "Cancelled by user" })}
+              onClick={() =>
+                submit("cancel", {
+                  reason: reason || t("app.cancelledByUserReason"),
+                })
+              }
             >
               {t("app.yesCancel")}
             </Button>
@@ -315,7 +328,7 @@ export function BookingActions({
           <Textarea
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            placeholder="Plans changed"
+            placeholder={t("app.plansChangedPlaceholder")}
           />
         </Field>
         {error ? <Alert tone="danger" className="mt-3">{error}</Alert> : null}
@@ -351,12 +364,12 @@ export function BookingActions({
             <div className="rounded-2xl border border-line bg-cream/60 p-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-2 text-stone">
-                  <TimerReset className="size-4" /> Billable active time
+                  <TimerReset className="size-4" /> {t("app.billableActiveTime")}
                 </span>
                 <span className="font-semibold text-forest">{minutesToHoursLabel(minutes)}</span>
               </div>
               <div className="mt-2 flex items-center justify-between text-xs text-stone">
-                <span>Break time (not billed)</span>
+                <span>{t("app.breakTimeNotBilled")}</span>
                 <span>{minutesToHoursLabel(breakMinutes)}</span>
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-line pt-3 text-sm">
@@ -367,7 +380,10 @@ export function BookingActions({
               </div>
             </div>
           ) : booking.pricingType === "acre" ? (
-            <Field label={t("app.acresCompleted")} hint={`Rate ${formatRupees(booking.agreedRate)} / acre`}>
+            <Field
+              label={t("app.acresCompleted")}
+              hint={`${t("app.agreedRate")} ${formatRupees(booking.agreedRate)}${t("common.perAcre")}`}
+            >
               <Input
                 type="number"
                 min="0.1"
@@ -377,7 +393,10 @@ export function BookingActions({
               />
             </Field>
           ) : (
-            <Field label={t("app.tripsCompleted")} hint={`Rate ${formatRupees(booking.agreedRate)} / trip`}>
+            <Field
+              label={t("app.tripsCompleted")}
+              hint={`${t("app.agreedRate")} ${formatRupees(booking.agreedRate)}${t("common.perTrip")}`}
+            >
               <Input
                 type="number"
                 min="1"
@@ -392,7 +411,7 @@ export function BookingActions({
             <span className="font-display text-2xl text-forest">{formatRupees(finishEstimate)}</span>
           </div>
           <p className="text-xs leading-relaxed text-stone">
-            The agreed rate stays unchanged. The final bill is calculated by the backend from the recorded work.
+            {t("app.rateStaysBody")}
           </p>
         </div>
         {error ? <Alert tone="danger" className="mt-3">{error}</Alert> : null}
@@ -416,7 +435,7 @@ export function BookingActions({
               onClick={() =>
                 submit("confirm_payment", {
                   method,
-                  notes: notes || "Owner marked payment done after receiving the money.",
+                  notes: notes || t("app.ownerMarkedPaymentNote"),
                 })
               }
             >
@@ -434,14 +453,14 @@ export function BookingActions({
               </span>
             </div>
             <p className="mt-1 text-xs text-stone">
-              Booked by {booking.farmer.name} · {booking.id}
+              {t("app.bookedBy", { name: booking.farmer.name })} · {booking.id}
             </p>
           </div>
 
           {booking.payments.filter((payment) => payment.paymentStatus !== "confirmed").length > 0 ? (
             <div className="rounded-2xl border border-line bg-cream/50 p-4">
               <p className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-stone">
-                Payment recorded earlier
+                {t("app.paymentRecordedEarlier")}
               </p>
               {booking.payments
                 .filter((payment) => payment.paymentStatus !== "confirmed")
@@ -471,7 +490,7 @@ export function BookingActions({
             <Input
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
-              placeholder="Received in cash at the farm"
+              placeholder={t("app.receivedCashPlaceholder")}
             />
           </Field>
 
@@ -483,8 +502,9 @@ export function BookingActions({
               className="mt-0.5 size-4 accent-[#163b2a]"
             />
             <span>
-              I have checked and received the full {formatRupees(booking.finalAmount)} directly. I
-              understand that an earlier payment note alone does not confirm receipt.
+              {t("app.confirmReceiptCheckbox", {
+                amount: formatRupees(booking.finalAmount),
+              })}
             </span>
           </label>
         </div>
@@ -515,19 +535,25 @@ export function BookingActions({
         <div className="space-y-4">
           <Field label={t("app.disputeReason")} required>
             <Select value={reason} onChange={(event) => setReason(event.target.value)}>
-              <option value="">Choose an issue</option>
-              <option value="Work duration or measurement">Work duration or measurement</option>
-              <option value="Final bill amount">Final bill amount</option>
-              <option value="Payment not confirmed">Payment not confirmed</option>
-              <option value="Work not completed as expected">Work not completed as expected</option>
-              <option value="Other">Other</option>
+              <option value="">{t("app.chooseIssue")}</option>
+              <option value="Work duration or measurement">
+                {t("app.issueWorkDuration")}
+              </option>
+              <option value="Final bill amount">{t("app.issueBillAmount")}</option>
+              <option value="Payment not confirmed">
+                {t("app.issuePaymentNotConfirmed")}
+              </option>
+              <option value="Work not completed as expected">
+                {t("app.issueWorkIncomplete")}
+              </option>
+              <option value="Other">{t("app.issueOther")}</option>
             </Select>
           </Field>
           <Field label={t("app.disputeDetails")} required>
             <Textarea
               value={details}
               onChange={(event) => setDetails(event.target.value)}
-              placeholder="Explain what happened. Include times, acres or trips where possible."
+              placeholder={t("app.issueDetailsPlaceholder")}
             />
           </Field>
           <Alert tone="info">
@@ -541,6 +567,7 @@ export function BookingActions({
 }
 
 export function WorkSummary({ booking }: { booking: BookingDetail }) {
+  const { t } = useI18n();
   const { minutes, breakMinutes, segments } = useWorkMinutes(booking);
   const measurement = booking.measurement;
   const billable = measurement?.billableMinutes ?? minutes;
@@ -552,7 +579,7 @@ export function WorkSummary({ booking }: { booking: BookingDetail }) {
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-xl bg-forest/6 px-3 py-2.5">
               <p className="text-[0.6rem] font-bold uppercase tracking-[0.12em] text-stone">
-                Active · billable
+                {t("app.activeBillable")}
               </p>
               <p className="mt-0.5 font-display text-lg text-forest">
                 {minutesToHoursLabel(booking.status === "COMPLETED" || booking.status === "PAID" ? billable : minutes)}
@@ -560,7 +587,7 @@ export function WorkSummary({ booking }: { booking: BookingDetail }) {
             </div>
             <div className="rounded-xl bg-sand/50 px-3 py-2.5">
               <p className="text-[0.6rem] font-bold uppercase tracking-[0.12em] text-stone">
-                Break · not billed
+                {t("app.breakNotBilled")}
               </p>
               <p className="mt-0.5 font-display text-lg text-forest">
                 {minutesToHoursLabel(breakMinutes)}
@@ -575,7 +602,7 @@ export function WorkSummary({ booking }: { booking: BookingDetail }) {
               >
                 <span className="text-stone">
                   {formatTime(segment.start)}
-                  {segment.end ? ` → ${formatTime(segment.end)}` : " → now"}
+                  {segment.end ? ` → ${formatTime(segment.end)}` : ` → ${t("app.nowLabel")}`}
                 </span>
                 <span className="font-semibold text-forest">
                   {segment.end
@@ -587,7 +614,7 @@ export function WorkSummary({ booking }: { booking: BookingDetail }) {
                           ),
                         ),
                       )
-                    : "Active"}
+                    : t("common.active")}
                 </span>
               </div>
             ))}
@@ -596,19 +623,27 @@ export function WorkSummary({ booking }: { booking: BookingDetail }) {
       ) : booking.pricingType === "acre" ? (
         <div className="rounded-xl bg-forest/6 px-3.5 py-3">
           <p className="text-[0.6rem] font-bold uppercase tracking-[0.12em] text-stone">
-            {tAcre(booking)}
+            {t(
+              booking.status === "COMPLETED" || booking.status === "PAID"
+                ? "app.completedArea"
+                : "app.estimatedArea",
+            )}
           </p>
           <p className="mt-0.5 font-display text-xl text-forest">
-            {measurement?.completedAcres ?? booking.estimatedAcres ?? "—"} acres
+            {t("app.acresCount", {
+              count: measurement?.completedAcres ?? booking.estimatedAcres ?? "—",
+            })}
           </p>
         </div>
       ) : (
         <div className="rounded-xl bg-forest/6 px-3.5 py-3">
           <p className="text-[0.6rem] font-bold uppercase tracking-[0.12em] text-stone">
-            Completed trips
+            {t("app.completedTrips")}
           </p>
           <p className="mt-0.5 font-display text-xl text-forest">
-            {measurement?.completedTrips ?? booking.estimatedTrips ?? "—"} trips
+            {t("app.tripsCount", {
+              count: measurement?.completedTrips ?? booking.estimatedTrips ?? "—",
+            })}
           </p>
         </div>
       )}
@@ -616,13 +651,8 @@ export function WorkSummary({ booking }: { booking: BookingDetail }) {
   );
 }
 
-function tAcre(booking: BookingDetail) {
-  return booking.status === "COMPLETED" || booking.status === "PAID"
-    ? "Completed area"
-    : "Estimated area";
-}
-
 export function BookingHistory({ booking }: { booking: BookingDetail }) {
+  const { t, statusLabel } = useI18n();
   return (
     <ol className="relative space-y-3 pl-4">
       <span className="absolute bottom-1 left-[0.3rem] top-1 w-px bg-line" />
@@ -634,8 +664,10 @@ export function BookingHistory({ booking }: { booking: BookingDetail }) {
             <p className="text-[0.62rem] text-stone">{formatDateTime(entry.createdAt)}</p>
           </div>
           <p className="mt-0.5 text-[0.62rem] uppercase tracking-[0.1em] text-stone/60">
-            {entry.changedByRole === "system" ? "System" : entry.changedByRole}
-            {entry.oldStatus ? ` · ${entry.oldStatus} → ${entry.newStatus}` : ` · ${entry.newStatus}`}
+            {entry.changedByRole === "system" ? t("app.system") : entry.changedByRole}
+            {entry.oldStatus
+              ? ` · ${statusLabel(entry.oldStatus)} → ${statusLabel(entry.newStatus)}`
+              : ` · ${statusLabel(entry.newStatus)}`}
           </p>
         </li>
       ))}

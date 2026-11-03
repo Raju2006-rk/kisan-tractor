@@ -43,7 +43,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, roleLabel } = useI18n();
   const { push } = useToast();
   const [online, setOnline] = useState(user.ownerProfile?.online ?? false);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -184,7 +184,7 @@ export function AppShell({
           </div>
           <div className="mt-3 flex items-center justify-between rounded-xl bg-cream/5 px-2.5 py-2">
             <span className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-cream/50">
-              {isOwner ? t("app.roleOwner") : t("app.roleFarmer")}
+              {roleLabel(user.role)}
             </span>
             <span className="inline-flex items-center gap-1 text-[0.62rem] font-semibold text-wheat">
               {isOwner

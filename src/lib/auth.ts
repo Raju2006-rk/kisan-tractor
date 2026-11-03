@@ -9,7 +9,6 @@ import { mutateDb, getDb } from "./db";
 import {
   getSupabaseAdmin,
   getSupabaseAuth,
-  isSupabaseAuthConfigured,
   isSupabaseDatabaseConfigured,
 } from "./supabase";
 import type {
@@ -447,7 +446,7 @@ export async function destroySession(): Promise<void> {
 export function isDevOtpEnabled(): boolean {
   if (process.env.AUTH_DEV_OTP === "true") return true;
   if (process.env.AUTH_DEV_OTP === "false") return false;
-  return true;
+  return process.env.NODE_ENV !== "production";
 }
 
 /** Remember this browser so the next login only needs the phone number. */

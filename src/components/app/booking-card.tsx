@@ -5,7 +5,6 @@ import { ArrowRight, CalendarDays, MapPin, Tractor, UserRound } from "lucide-rea
 import { Photo } from "@/components/ui/photo";
 import { Badge, StatusBadge } from "@/components/ui/primitives";
 import { BookingActions, useWorkMinutes } from "@/components/app/booking-actions";
-import { PRICING_LABELS, PRICING_UNITS } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 import { formatRupees, minutesToHoursLabel } from "@/lib/pricing";
 import type { BookingDetail, Role } from "@/lib/types";
@@ -27,6 +26,18 @@ export function BookingCard({
   onUpdated?: (booking: BookingDetail) => void;
 }) {
   const { t, serviceLabel } = useI18n();
+  const pricingLabel =
+    booking.pricingType === "hourly"
+      ? t("app.hourly")
+      : booking.pricingType === "acre"
+        ? t("app.perAcre")
+        : t("app.perTrip");
+  const pricingUnit =
+    booking.pricingType === "hourly"
+      ? t("common.perHour")
+      : booking.pricingType === "acre"
+        ? t("common.perAcre")
+        : t("common.perTrip");
   const { minutes } = useWorkMinutes(booking);
   const active =
     booking.status === "IN_PROGRESS" ||
@@ -57,12 +68,12 @@ export function BookingCard({
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
               <StatusBadge status={booking.status} role={role} />
-              {booking.bookingFor === "other" ? (
-                <Badge tone="clay">For {booking.recipientName}</Badge>
+              {booking.bookingFor === "other" && booking.recipientName ? (
+                <Badge tone="clay">{t("app.forRecipient", { name: booking.recipientName })}</Badge>
               ) : null}
               {active ? (
                 <Badge tone="blue" dot>
-                  {minutesToHoursLabel(minutes)} active
+                  {t("app.activeFor", { time: minutesToHoursLabel(minutes) })}
                 </Badge>
               ) : null}
             </div>
@@ -102,10 +113,10 @@ export function BookingCard({
           <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[0.68rem]">
               <span className="text-stone">
-                {PRICING_LABELS[booking.pricingType]} ·{" "}
+                {pricingLabel} ·{" "}
                 <span className="font-semibold text-forest">
                   {formatRupees(booking.agreedRate)}
-                  {PRICING_UNITS[booking.pricingType]}
+                  {pricingUnit}
                 </span>
               </span>
               <span className="text-stone">
@@ -131,7 +142,10 @@ export function BookingCard({
 
       {!compact && booking.status === "PAYMENT_PENDING" && role === "owner" ? (
         <div className="border-t border-wheat/50 bg-wheat/15 px-4 py-2 text-[0.68rem] font-medium text-[#7a5a1d] sm:px-5">
-          Confirm only after you receive {formatRupees(booking.finalAmount)} directly from {otherParty.name}.
+          {t("app.confirmOnlyAfterReceive", {
+            amount: formatRupees(booking.finalAmount),
+            name: otherParty.name,
+          })}
         </div>
       ) : null}
     </div>
