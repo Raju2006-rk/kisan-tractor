@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import "leaflet/dist/leaflet.css";
 import type { Map as LeafletMap } from "leaflet";
 import { Loader2 } from "lucide-react";
 import {
@@ -167,7 +166,7 @@ function GoogleExploreMap({
         if (cancelled || !containerRef.current || mapRef.current) return;
         try {
           const map = new google.maps.Map(containerRef.current, {
-            center,
+            center: { lat: center.lat, lng: center.lng },
             zoom: 11,
             mapTypeControl: false,
             streetViewControl: false,
@@ -180,7 +179,7 @@ function GoogleExploreMap({
 
           // User location marker
           userMarkerRef.current = new google.maps.Marker({
-            position: center,
+            position: { lat: center.lat, lng: center.lng },
             map,
             title: t("common.currentLocation"),
             zIndex: 999,
@@ -224,9 +223,9 @@ function GoogleExploreMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
-    map.panTo(center);
+    map.panTo({ lat: center.lat, lng: center.lng });
     map.setZoom(13);
-    userMarkerRef.current?.setPosition(center);
+    userMarkerRef.current?.setPosition({ lat: center.lat, lng: center.lng });
   }, [center.lat, center.lng, ready]);
 
   useEffect(() => {
@@ -276,10 +275,10 @@ function GoogleExploreMap({
     if (!bounds.isEmpty()) {
       map.fitBounds(bounds, 46);
     } else {
-      map.setCenter(center);
+      map.setCenter({ lat: center.lat, lng: center.lng });
       map.setZoom(11);
     }
-  }, [center, ready, tractors, t]);
+  }, [center.lat, center.lng, ready, tractors, t]);
 
   return <div ref={containerRef} className="h-[430px] w-full lg:h-[590px]" />;
 }
