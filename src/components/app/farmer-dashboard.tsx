@@ -90,7 +90,7 @@ export function FarmerDashboard({ user }: { user: SessionUser }) {
             </span>
           </div>
           <h1 className="mt-2 font-display text-3xl text-forest sm:text-[2.4rem]">
-            {t("app.namaste", { name: user.name.split(" ")[0] })}
+            {t("app.namaste", { name: (user.name || "Kisan").split(" ")[0] })}
           </h1>
           <p className="mt-1 text-sm text-stone">{t("app.farmerHomeSub")}</p>
         </div>
@@ -389,9 +389,9 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
   );
   const payments = bookings
     .flatMap((booking) =>
-      booking.payments.map((payment) => ({ booking, payment })),
+      (booking.payments ?? []).map((payment) => ({ booking, payment })),
     )
-    .sort((a, b) => b.payment.paidAt.localeCompare(a.payment.paidAt))
+    .sort((a, b) => (b.payment?.paidAt ?? "").localeCompare(a.payment?.paidAt ?? ""))
     .slice(0, 4);
   const tractor = tractorData?.tractors?.[0];
 
@@ -435,7 +435,7 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
             </span>
           </div>
           <h1 className="mt-2 font-display text-3xl text-forest sm:text-[2.4rem]">
-            {t("app.namaste", { name: user.name.split(" ")[0] })}
+            {t("app.namaste", { name: (user.name || "Kisan").split(" ")[0] })}
           </h1>
           <p className="mt-1 text-sm text-stone">{t("app.ownerHomeSub")}</p>
         </div>
@@ -590,13 +590,13 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
                   </Badge>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {tractor.pricing.hourlyEnabled ? (
+                  {tractor.pricing?.hourlyEnabled ? (
                     <Badge tone="stone">{formatRupees(tractor.pricing.hourlyRate)}/hr</Badge>
                   ) : null}
-                  {tractor.pricing.acreEnabled ? (
+                  {tractor.pricing?.acreEnabled ? (
                     <Badge tone="stone">{formatRupees(tractor.pricing.acreRate)}/acre</Badge>
                   ) : null}
-                  {tractor.pricing.tripEnabled ? (
+                  {tractor.pricing?.tripEnabled ? (
                     <Badge tone="stone">{formatRupees(tractor.pricing.tripRate)}/trip</Badge>
                   ) : null}
                 </div>

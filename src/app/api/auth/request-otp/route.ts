@@ -68,6 +68,7 @@ export async function POST(request: Request) {
     if (existing && (await isTrustedDevice(existing.id, mobile))) {
       await createSession(existing.id);
       await rememberDevice(existing);
+      const { otp, expiresAt } = await createOtpChallenge(mobile, existing.role);
       return NextResponse.json({
         ok: true,
         signedIn: true,
@@ -75,6 +76,8 @@ export async function POST(request: Request) {
         mobile,
         role: existing.role,
         name: existing.name,
+        devOtp: isDevOtpEnabledFor(mobile) ? otp : undefined,
+        expiresAt,
       });
     }
 

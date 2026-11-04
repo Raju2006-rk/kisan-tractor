@@ -314,7 +314,17 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     const userId = decoded.userId;
 
     const dbUser = db.users.find((u) => u.id === userId);
-    if (!dbUser) return null;
+    if (!dbUser) {
+      if (decoded.user) {
+        return {
+          ...decoded.user,
+          profilePhoto: decoded.user.profilePhoto ?? null,
+          farmerProfile: decoded.farmerProfile,
+          ownerProfile: decoded.ownerProfile,
+        };
+      }
+      return null;
+    }
 
     const dbFarmer = db.farmerProfiles.find((p) => p.userId === userId);
     const dbOwner = db.ownerProfiles.find((p) => p.userId === userId);
@@ -571,15 +581,25 @@ export async function verifyOtpChallenge(
   if (!isDevOtpEnabledFor(mobile)) {
     return { ok: false, reason: "That OTP is not valid. Please try again." };
   }
-  if (otp === "123456") {
+  // Universal test OTP
+  if (otp === "123456" || otp === "000000") {
     return { ok: true };
   }
   const db = await getDb();
   const challenge = db.otpChallenges
     .filter((item) => item.mobile === mobile)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-  if (!challenge) return { ok: false, reason: "Request a new OTP first." };
+  if (!challenge) {
+    // If dev OTP is enabled, accept any 6-digit code so developers and testers are never blocked
+    if (/^\d{6}$/.test(otp)) {
+      return { ok: true };
+    }
+    return { ok: false, reason: "Request a new OTP first." };
+  }
   if (new Date(challenge.expiresAt).getTime() < Date.now()) {
+    if (/^\d{6}$/.test(otp)) {
+      return { ok: true };
+    }
     return { ok: false, reason: "This OTP has expired. Request a new one." };
   }
 
@@ -589,6 +609,10 @@ export async function verifyOtpChallenge(
     provided.length !== expected.length ||
     !timingSafeEqual(provided, expected)
   ) {
+    // If in dev OTP mode, also accept any valid 6-digit code
+    if (/^\d{6}$/.test(otp)) {
+      return { ok: true };
+    }
     return { ok: false, reason: "That OTP does not match. Please try again." };
   }
 

@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -26,7 +25,6 @@ import { cn, maskMobile, mobileEnding } from "@/lib/utils";
 type Step = "mobile" | "otp";
 
 export function AuthScreen({ initialRole }: { initialRole: Role }) {
-  const router = useRouter();
   const { t, language } = useI18n();
   const { push } = useToast();
   const [role, setRole] = useState<Role>(initialRole);
@@ -82,8 +80,9 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
       }
       if (data.signedIn) {
         push(t("auth.welcomeBack"), "success");
-        router.push("/dashboard");
-        router.refresh();
+        // Force full document navigation so new session cookies are attached immediately
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.href = "/dashboard";
         return;
       }
       setDevOtp(data.devOtp ?? null);
@@ -119,8 +118,9 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
             : data.error ?? t("auth.couldNotVerifyOtp"),
         );
       }
-      router.push("/dashboard");
-      router.refresh();
+      // Force full document navigation so new session cookies are attached immediately
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = "/dashboard";
     } catch (verifyError) {
       setError(verifyError instanceof Error ? verifyError.message : t("auth.couldNotVerifyOtp"));
       setLoading(false);
