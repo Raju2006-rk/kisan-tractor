@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   createSession,
   findOrCreateUser,
+  isDevOtpEnabledFor,
   isValidMobile,
   normalizeMobile,
   rememberDevice,
@@ -49,19 +50,14 @@ export async function POST(request: Request) {
     if (mobileLimited) return mobileLimited;
 
     let supabaseUserId: string | undefined;
-    if (isSupabaseAuthConfigured()) {
+    if (!isDevOtpEnabledFor(mobile) && isSupabaseAuthConfigured()) {
       const verified = await verifySupabaseOtp(mobile, otp);
       if ("error" in verified) {
-        // Development challenges only exist outside production. Do not let a
-        // stale local challenge become a production login path.
-        const fallback = await verifyOtpChallenge(mobile, otp);
-        if (!fallback.ok) {
-          return jsonError(verified.error, 400);
-        }
-      } else {
-        supabaseUserId = verified.supabaseUserId;
+        return jsonError(verified.error, 400);
       }
+      supabaseUserId = verified.supabaseUserId;
     } else {
+      // Test OTP path, or a deployment without Supabase Auth configured.
       const verified = await verifyOtpChallenge(mobile, otp);
       if (!verified.ok) {
         return jsonError(verified.reason ?? "Could not verify this OTP.", 400);

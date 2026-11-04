@@ -21,7 +21,7 @@ route, upload path, or auth flow changes.
 | 11 | SSTI | Not applicable | No template engine evaluates user input. |
 | 12 | Path traversal | Pass | Upload names are server-generated UUIDs. Private file names must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`; `..`, `/`, and backslashes are rejected by the proxy and route. |
 | 13 | Access control | Pass | Every mutating route calls `requireUser` and re-checks role/ownership in the service layer. Bookings are readable only by their two parties. Private documents are readable only by the owning account; unknown names return 404. Public tractor listings no longer expose owner phone, payment, or document data. |
-| 14 | Authentication | Pass | Supabase phone OTP in production; local OTP only outside production or with `AUTH_DEV_OTP=true`. OTPs are consumed after use and compared with `timingSafeEqual`. Signed `kt_session` cookie with HMAC-SHA256. Production refuses to start sessions without `SESSION_SECRET`. |
+| 14 | Authentication | Pass | Supabase phone OTP in production. Test OTP is off by default in production; when `AUTH_DEV_OTP=true` it is limited to the numbers in `AUTH_DEV_OTP_PHONES` (if set) and should be disabled after testing. OTPs are consumed after use and compared with `timingSafeEqual`. Signed `kt_session` cookie with HMAC-SHA256. Production refuses to start sessions without `SESSION_SECRET`. |
 | 15 | WebSockets | Not applicable | The app does not open WebSocket servers. Next.js dev HMR is local-only. |
 | 16 | Web cache poisoning | Pass | API responses are `Cache-Control: no-store`, `Vary: Origin, Cookie`; no user input is reflected into cache keys or headers. |
 | 17 | Insecure deserialization | Pass | Only `JSON.parse` of request bodies and the app-state document. Parsed bodies reject `__proto__`, `prototype`, and `constructor` keys. No native serialization gadgets. |
@@ -73,6 +73,19 @@ fall back to OpenStreetMap automatically.
 The server-side reverse geocoder also falls back to Nominatim and pauses Google
 for 10 minutes after a `REQUEST_DENIED`, so a misconfigured key does not add
 latency to every address lookup.
+
+## Test OTP mode
+
+For testing a deployment where SMS cannot be delivered, set `AUTH_DEV_OTP=true`.
+The API then returns the OTP in its response and the sign-in screen shows it with
+an autofill button. To keep SMS working for real users, also set
+`AUTH_DEV_OTP_PHONES` to a comma-separated list of the 10-digit numbers allowed to
+use the test OTP, for example `AUTH_DEV_OTP_PHONES=9876543210,9123456789`.
+
+The test OTP path is local to this app, consumes the challenge after use, and is
+still covered by the OTP rate limits. It is an explicit testing aid: set
+`AUTH_DEV_OTP=false` (or remove the variable) before a public launch so only
+Supabase SMS OTPs can sign users in.
 
 ## Required production secrets
 

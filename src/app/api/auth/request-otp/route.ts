@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   createOtpChallenge,
   createSession,
-  isDevOtpEnabled,
+  isDevOtpEnabledFor,
   isTrustedDevice,
   isValidMobile,
   normalizeMobile,
@@ -78,7 +78,12 @@ export async function POST(request: Request) {
       });
     }
 
-    const useDevOtp = isDevOtpEnabled();
+    const useDevOtp = isDevOtpEnabledFor(mobile);
+    if (useDevOtp && process.env.NODE_ENV === "production") {
+      console.warn(
+        "[request-otp] Test OTP mode is active in production for an allowlisted number. Disable AUTH_DEV_OTP before public launch.",
+      );
+    }
 
     if (!useDevOtp && isSupabaseAuthConfigured()) {
       try {

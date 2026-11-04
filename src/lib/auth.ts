@@ -453,11 +453,32 @@ export async function destroySession(): Promise<void> {
   jar.delete(SESSION_COOKIE);
 }
 
-/** True when a local development OTP may be generated instead of sending SMS. */
+/** True when a local test OTP may be generated instead of sending SMS. */
 export function isDevOtpEnabled(): boolean {
   if (process.env.AUTH_DEV_OTP === "true") return true;
   if (process.env.AUTH_DEV_OTP === "false") return false;
   return process.env.NODE_ENV !== "production";
+}
+
+/**
+ * Optional comma-separated allowlist for test OTPs. When set, only those phone
+ * numbers skip SMS, so a production deployment can keep the test OTP for its
+ * own numbers while everyone else still receives a real SMS. An empty list
+ * keeps the legacy behaviour (every number uses the test OTP).
+ */
+function devOtpAllowlist(): string[] {
+  return (process.env.AUTH_DEV_OTP_PHONES ?? "")
+    .split(",")
+    .map((value) => normalizeMobile(value))
+    .filter(Boolean);
+}
+
+/** True when this phone number may use the local test OTP. */
+export function isDevOtpEnabledFor(mobile: string): boolean {
+  if (!isDevOtpEnabled()) return false;
+  const allowlist = devOtpAllowlist();
+  if (!allowlist.length) return true;
+  return allowlist.includes(normalizeMobile(mobile));
 }
 
 /** Remember this browser so the next login only needs the phone number. */
@@ -519,13 +540,17 @@ export async function verifySupabaseOtp(
   return { supabaseUserId: data.user.id };
 }
 
-/** Development-only OTP. Never used when Supabase Auth is configured. */
+/**
+ * Test OTP. It is generated locally instead of sending an SMS and is returned
+ * to the caller, so it must only be enabled for testing (AUTH_DEV_OTP, and
+ * optionally AUTH_DEV_OTP_PHONES to restrict it to specific numbers).
+ */
 export async function createOtpChallenge(
   mobile: string,
   role: Role | null,
 ): Promise<{ otp: string; expiresAt: string }> {
-  if (!isDevOtpEnabled()) {
-    throw new Error("Development OTPs are disabled.");
+  if (!isDevOtpEnabledFor(mobile)) {
+    throw new Error("Test OTPs are disabled for this number.");
   }
   const otp = String(randomInt(100000, 1000000));
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
@@ -551,7 +576,7 @@ export async function verifyOtpChallenge(
   mobile: string,
   otp: string,
 ): Promise<{ ok: boolean; reason?: string }> {
-  if (!isDevOtpEnabled()) {
+  if (!isDevOtpEnabledFor(mobile)) {
     return { ok: false, reason: "That OTP is not valid. Please try again." };
   }
   const db = await getDb();
