@@ -115,6 +115,62 @@ function formFromTractor(tractor: TractorWithOwner): TractorForm {
   };
 }
 
+function compressImageFile(
+  file: File,
+  maxDim = 1280,
+  quality = 0.82,
+): Promise<{ dataUrl: string; blob: Blob }> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          const rawUrl = (e.target?.result as string) || "";
+          resolve({ dataUrl: rawUrl, blob: file });
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve({ dataUrl, blob });
+            } else {
+              resolve({ dataUrl, blob: file });
+            }
+          },
+          "image/jpeg",
+          quality,
+        );
+      };
+      img.onerror = () => {
+        const rawUrl = (e.target?.result as string) || "";
+        resolve({ dataUrl: rawUrl, blob: file });
+      };
+      img.src = (e.target?.result as string) || "";
+    };
+    reader.onerror = () => {
+      resolve({ dataUrl: "", blob: file });
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export function OwnerTractorScreen({ user }: { user: SessionUser }) {
   const { t, equipmentLabel, equipmentDescription } = useI18n();
   const { push } = useToast();
@@ -138,6 +194,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
     lat: user.ownerProfile?.lat && user.ownerProfile.lat !== 0 ? user.ownerProfile.lat : 12.9716,
     lng: user.ownerProfile?.lng && user.ownerProfile.lng !== 0 ? user.ownerProfile.lng : 77.5946,
   }));
+  const [formDistrict, setFormDistrict] = useState<string>(() => user.ownerProfile?.district ?? "");
+  const [formState, setFormState] = useState<string>(() => user.ownerProfile?.state ?? "");
   const [locating, setLocating] = useState(false);
   const [formLocationError, setFormLocationError] = useState<string | null>(null);
   const [formLocationNote, setFormLocationNote] = useState<string | null>(null);
@@ -164,6 +222,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
       lat: user.ownerProfile?.lat && user.ownerProfile.lat !== 0 ? user.ownerProfile.lat : 12.9716,
       lng: user.ownerProfile?.lng && user.ownerProfile.lng !== 0 ? user.ownerProfile.lng : 77.5946,
     });
+    setFormDistrict(user.ownerProfile?.district ?? "");
+    setFormState(user.ownerProfile?.state ?? "");
     setError(null);
     setFormLocationError(null);
     setFormLocationNote(null);
@@ -173,6 +233,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
   function startEdit(tractor: TractorWithOwner) {
     setForm(formFromTractor(tractor));
     setFormCoords({ lat: tractor.lat, lng: tractor.lng });
+    setFormDistrict(tractor.district);
+    setFormState(tractor.state);
     setError(null);
     setFormLocationError(null);
     setFormLocationNote(null);
@@ -186,7 +248,11 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
     const match = VILLAGES.find(
       (item) => item.name.toLowerCase() === value.trim().toLowerCase(),
     );
-    if (match) setFormCoords({ lat: match.lat, lng: match.lng });
+    if (match) {
+      setFormCoords({ lat: match.lat, lng: match.lng });
+      setFormDistrict(match.district);
+      setFormState(match.state);
+    }
   }
 
   function useFormLocation() {
@@ -210,8 +276,14 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
 
         try {
           const geo = await reverseGeocode(lat, lng);
-          if (geo.village) update("village", geo.village);
-          const summary = [geo.village, geo.district].filter(Boolean).join(", ");
+          const detected =
+            geo.village ||
+            geo.district ||
+            (geo.address ? geo.address.split(",")[0].trim() : "");
+          if (detected) update("village", detected);
+          if (geo.district) setFormDistrict(geo.district);
+          if (geo.state) setFormState(geo.state);
+          const summary = [detected, geo.district, geo.state].filter(Boolean).join(", ");
           setFormLocationNote(
             summary
               ? t("app.tractorLocationFound", { summary })
@@ -251,25 +323,22 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
     setUploading(true);
     setError(null);
     try {
-      // 1. Read file as base64 data URL immediately for instant preview & guaranteed offline persistence
-      const reader = new FileReader();
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      // 1. Client-side compression to max 1280px at 0.82 JPEG quality
+      const { dataUrl, blob } = await compressImageFile(file);
 
-      // Update form image immediately so owner sees their photo right away
-      setForm((current) => ({
-        ...current,
-        image: dataUrl,
-        images: [dataUrl, ...current.images.filter((item) => item !== dataUrl)],
-      }));
+      // Immediately display preview in form so owner sees photo right away
+      if (dataUrl) {
+        setForm((current) => ({
+          ...current,
+          image: dataUrl,
+          images: [dataUrl, ...current.images.filter((item) => item !== dataUrl)],
+        }));
+      }
 
-      // 2. Upload to server
+      // 2. Upload the compressed blob to server
       try {
         const body = new FormData();
-        body.append("file", file);
+        body.append("file", blob, "tractor.jpg");
         const response = await fetch("/api/upload", { method: "POST", body });
         const result = (await response.json()) as { error?: string; url?: string };
         if (response.ok && result.url) {
@@ -305,8 +374,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
       const matchedVillage = VILLAGES.find(
         (item) => item.name.toLowerCase() === village.toLowerCase(),
       );
-      const district = matchedVillage?.district || user.ownerProfile?.district || "Bengaluru Urban";
-      const state = matchedVillage?.state || user.ownerProfile?.state || "Karnataka";
+      const district = formDistrict || matchedVillage?.district || user.ownerProfile?.district || "Bengaluru Urban";
+      const state = formState || matchedVillage?.state || user.ownerProfile?.state || "Karnataka";
       let lat = formCoords.lat;
       let lng = formCoords.lng;
       if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
@@ -355,6 +424,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
         "success",
       );
       setFormOpen(false);
+      setForm(emptyForm(user));
+      setError(null);
     } catch (saveError) {
       const msg = saveError instanceof Error ? saveError.message : t("app.couldNotSaveTractor");
       setError(msg);

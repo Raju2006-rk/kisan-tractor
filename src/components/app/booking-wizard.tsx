@@ -364,11 +364,15 @@ export function BookingWizard({
 
         try {
           const geo = await reverseGeocode(lat, lng);
-          if (geo.village) setVillageName(geo.village);
+          const detected =
+            geo.village ||
+            geo.district ||
+            (geo.address ? geo.address.split(",")[0].trim() : "");
+          if (detected) setVillageName(detected);
           if (geo.address) setFarmLabel(geo.address);
           push(
-            geo.village
-              ? t("app.wizardLocationDetected", { village: geo.village })
+            detected
+              ? t("app.wizardLocationDetected", { village: detected })
               : t("app.wizardLocationCaptured"),
             "success",
           );

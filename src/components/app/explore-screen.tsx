@@ -122,7 +122,11 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
 
         try {
           const geo = await reverseGeocode(lat, lng);
-          setLocationLabel(geo.village || t("app.yourLocation"));
+          const detected =
+            geo.village ||
+            geo.district ||
+            (geo.address ? geo.address.split(",")[0].trim() : "");
+          setLocationLabel(detected || t("app.yourLocation"));
         } catch {
           setLocationLabel(t("app.yourLocation"));
         } finally {

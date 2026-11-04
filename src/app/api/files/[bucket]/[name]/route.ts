@@ -93,7 +93,6 @@ export async function GET(
       headers: {
         "Content-Type": contentType,
         "Content-Disposition": `inline; filename="${name}"`,
-        "Content-Security-Policy": "default-src 'none'; sandbox",
         "Cache-Control": cacheHeader,
         "X-Content-Type-Options": "nosniff",
       },

@@ -108,7 +108,7 @@ async function reverseWithGoogle(
     if (data.status !== "OK" || !result) return null;
 
     const components = result.address_components ?? [];
-    const village = componentOf(
+    let village = componentOf(
       components,
       "sublocality_level_2",
       "sublocality_level_1",
@@ -118,6 +118,12 @@ async function reverseWithGoogle(
       "postal_town",
       "neighborhood",
     );
+    if (!village && result.formatted_address) {
+      const firstPart = result.formatted_address.split(",")[0]?.trim();
+      if (firstPart && !/^\d+$/.test(firstPart)) {
+        village = firstPart;
+      }
+    }
     const district = componentOf(
       components,
       "administrative_area_level_2",
@@ -169,15 +175,23 @@ async function reverseWithNominatim(
     const village =
       addr.village ||
       addr.hamlet ||
+      addr.subdistrict ||
+      addr.taluk ||
+      addr.tehsil ||
+      addr.mandal ||
+      addr.isolated_dwelling ||
       addr.suburb ||
       addr.neighbourhood ||
+      addr.quarter ||
+      addr.residential ||
       addr.town ||
       addr.municipality ||
       addr.city ||
-      "";
+      (data.display_name ? data.display_name.split(",")[0].trim() : "");
     const district =
       addr.state_district ||
       addr.county ||
+      addr.district ||
       addr.city_district ||
       addr.city ||
       "";

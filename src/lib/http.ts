@@ -3,7 +3,7 @@ import { getSessionUser } from "./auth";
 import { ServiceError } from "./booking-service";
 import type { SessionUser } from "./types";
 
-const MAX_JSON_BYTES = 64 * 1024;
+const MAX_JSON_BYTES = 15 * 1024 * 1024; // 15 MB to accommodate base64 image payloads and camera uploads
 const FORBIDDEN_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 
 export function jsonError(message: string, status = 400) {

@@ -183,15 +183,22 @@ async function reverseWithOpenStreetMap(
     const village =
       addr.village ||
       addr.hamlet ||
+      addr.subdistrict ||
+      addr.taluk ||
+      addr.tehsil ||
+      addr.mandal ||
+      addr.isolated_dwelling ||
       addr.suburb ||
       addr.neighbourhood ||
+      addr.quarter ||
+      addr.residential ||
       addr.town ||
       addr.municipality ||
       addr.city ||
-      "";
+      (data.display_name ? data.display_name.split(",")[0].trim() : "");
     const pincode = addr.postcode || "";
     const district =
-      addr.state_district || addr.county || addr.city_district || addr.city || "";
+      addr.state_district || addr.county || addr.district || addr.city_district || addr.city || "";
     const state = addr.state || "";
     const address =
       data.display_name ||

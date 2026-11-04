@@ -103,13 +103,17 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
 
         try {
           const geo = await reverseGeocode(lat, lng);
-          if (geo.village) setVillage(geo.village);
+          const detected =
+            geo.village ||
+            geo.district ||
+            (geo.address ? geo.address.split(",")[0].trim() : "");
+          if (detected) setVillage(detected);
           if (geo.address) setAddress(geo.address);
           if (geo.pincode) setPincode(geo.pincode);
           if (geo.district) setDistrict(geo.district);
           if (geo.state) setStateName(geo.state);
 
-          const summary = [geo.village, geo.district, geo.state]
+          const summary = [detected, geo.district, geo.state]
             .filter(Boolean)
             .join(", ");
           setLocationNote(
