@@ -3,6 +3,9 @@ import type { ReactNode } from "react";
 import { getSessionUser } from "@/lib/auth";
 import { AppShell } from "@/components/app/app-shell";
 
+// Every page in this group depends on the signed-in user's session.
+export const dynamic = "force-dynamic";
+
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await getSessionUser();
   if (!user) redirect("/auth");

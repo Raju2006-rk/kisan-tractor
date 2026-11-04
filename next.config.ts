@@ -51,6 +51,11 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Pin the workspace root to this project. Without it Turbopack walks up to a
+  // lockfile outside the repository and warns on every dev/build run.
+  turbopack: {
+    root: __dirname,
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "*.supabase.co" },

@@ -4,6 +4,8 @@ import { AuthScreen } from "@/components/auth/auth-screen";
 import type { Role, SessionUser } from "@/lib/types";
 
 export const metadata = { title: "Sign in" };
+// The page redirects signed-in users, so it must be rendered per request.
+export const dynamic = "force-dynamic";
 
 export default async function AuthPage({
   searchParams,
