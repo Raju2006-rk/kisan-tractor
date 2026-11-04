@@ -1,15 +1,12 @@
 "use client";
 
 import { useDeferredValue, useMemo, useState } from "react";
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import useSWR from "swr";
 import {
   ArrowRight,
   Compass,
-  List,
   LocateFixed,
-  Map as MapIcon,
   MapPin,
   Search,
   SlidersHorizontal,
@@ -31,11 +28,6 @@ import { useI18n } from "@/lib/i18n";
 import type { PricingType, ServiceType, SessionUser, TractorWithOwner } from "@/lib/types";
 import { cn, reverseGeocode } from "@/lib/utils";
 
-const ExploreMap = dynamic(() => import("@/components/app/explore-map"), {
-  ssr: false,
-  loading: () => <Skeleton className="h-[430px] w-full lg:h-[590px]" />,
-});
-
 type Sort = "nearest" | "price";
 
 export function ExploreScreen({ user }: { user: SessionUser }) {
@@ -46,7 +38,6 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
   const [pricing, setPricing] = useState<PricingType | "all">("all");
   const [distance, setDistance] = useState("all");
   const [sort, setSort] = useState<Sort>("nearest");
-  const [view, setView] = useState<"list" | "map">("map");
   const [locating, setLocating] = useState(false);
   const deferredQuery = useDeferredValue(query);
 
@@ -184,28 +175,6 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
             <LocateFixed className="size-3.5" />
             {locating ? t("common.locating") : t("common.useMyLocation")}
           </Button>
-          <div className="flex rounded-full border border-line bg-paper p-1">
-            <button
-              type="button"
-              onClick={() => setView("list")}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition",
-                view === "list" ? "bg-forest text-cream" : "text-stone hover:text-forest",
-              )}
-            >
-              <List className="size-3.5" /> {t("app.listView")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setView("map")}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition",
-                view === "map" ? "bg-forest text-cream" : "text-stone hover:text-forest",
-              )}
-            >
-              <MapIcon className="size-3.5" /> {t("app.mapView")}
-            </button>
-          </div>
         </div>
       </div>
 
@@ -353,65 +322,43 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
             </button>
           }
         />
+      ) : isLoading ? (
+        <div className="space-y-3">
+          {[0, 1, 2, 3].map((item) => (
+            <Skeleton key={item} className="h-48 w-full" />
+          ))}
+        </div>
+      ) : tractors.length === 0 ? (
+        <EmptyState
+          icon={<Tractor className="size-5" />}
+          title={t("common.noResults")}
+          body={t("app.noResultsBody")}
+          action={
+            <button type="button" onClick={resetFilters} className={buttonStyles("primary", "sm")}>
+              {t("app.clearFilters")} <X className="size-3.5" />
+            </button>
+          }
+        />
       ) : (
-        <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
-          {/* Tractor cards / search results */}
-          <div className={cn("space-y-3", view === "map" ? "order-2 lg:order-1" : "order-1")}>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[0, 1, 2, 3].map((item) => (
-                  <Skeleton key={item} className="h-48 w-full" />
-                ))}
+        <div className="space-y-3">
+          {tractors.map((tractor) => (
+            <TractorCard key={tractor.id} tractor={tractor} layout="row" />
+          ))}
+          <div className="flex flex-col items-start justify-between gap-3 rounded-[1.4rem] border border-forest/10 bg-[linear-gradient(120deg,#eaf0e4,#f3ecd9)] p-4 sm:flex-row sm:items-center">
+            <div className="flex items-start gap-2.5">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-forest text-wheat">
+                <MapPin className="size-4" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-forest">{t("app.cantFindTractor")}</p>
+                <p className="mt-0.5 text-[0.7rem] leading-relaxed text-stone">
+                  {t("app.cantFindTractorBody")}
+                </p>
               </div>
-            ) : tractors.length === 0 ? (
-              <EmptyState
-                icon={<Tractor className="size-5" />}
-                title={t("common.noResults")}
-                body={t("app.noResultsBody")}
-                action={
-                  <button type="button" onClick={resetFilters} className={buttonStyles("primary", "sm")}>
-                    {t("app.clearFilters")} <X className="size-3.5" />
-                  </button>
-                }
-              />
-            ) : (
-              <>
-                {tractors.map((tractor) => (
-                  <TractorCard key={tractor.id} tractor={tractor} layout="row" />
-                ))}
-                <div className="flex flex-col items-start justify-between gap-3 rounded-[1.4rem] border border-forest/10 bg-[linear-gradient(120deg,#eaf0e4,#f3ecd9)] p-4 sm:flex-row sm:items-center">
-                  <div className="flex items-start gap-2.5">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-forest text-wheat">
-                      <MapPin className="size-4" />
-                    </span>
-                    <div>
-                      <p className="text-sm font-semibold text-forest">{t("app.cantFindTractor")}</p>
-                      <p className="mt-0.5 text-[0.7rem] leading-relaxed text-stone">
-                        {t("app.cantFindTractorBody")}
-                      </p>
-                    </div>
-                  </div>
-                  <Link href="/help" className={buttonStyles("outline", "sm", "shrink-0")}>
-                    {t("common.help")} <ArrowRight className="size-3.5" />
-                  </Link>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Interactive Map */}
-          <div
-            className={cn(
-              "lg:sticky lg:top-4 lg:block",
-              view === "map" ? "order-1 block lg:order-2" : "hidden lg:block",
-            )}
-          >
-            <ExploreMap
-              tractors={tractors}
-              center={coords}
-              onLocate={useMyLocation}
-              locating={locating}
-            />
+            </div>
+            <Link href="/help" className={buttonStyles("outline", "sm", "shrink-0")}>
+              {t("common.help")} <ArrowRight className="size-3.5" />
+            </Link>
           </div>
         </div>
       )}
