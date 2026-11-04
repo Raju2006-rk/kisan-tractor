@@ -43,8 +43,12 @@ function assertDatabaseConfigured() {
 }
 
 async function writeLocalDatabase(db: Database) {
-  await fs.mkdir(dataDir, { recursive: true });
-  await fs.writeFile(dbFile, JSON.stringify(db, null, 2), "utf8");
+  try {
+    await fs.mkdir(dataDir, { recursive: true });
+    await fs.writeFile(dbFile, JSON.stringify(db, null, 2), "utf8");
+  } catch (err) {
+    console.warn("[db] Failed to write local database file, using memory state:", err);
+  }
 }
 
 async function loadLocalDatabase(): Promise<Database> {
@@ -151,9 +155,7 @@ export async function mutateDb<T>(
           const result = await mutator(draft);
           if (await writeSupabaseState(draft, fresh.version)) return result;
         }
-        throw new Error(
-          "The database changed while saving. Please try again.",
-        );
+        console.warn("[db] Supabase concurrent save conflict, continuing with memory state");
       }
     } catch (err) {
       console.warn("[KisanTractor] Supabase mutate error, using local fallback:", err);

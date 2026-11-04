@@ -17,10 +17,14 @@ export function handleApiError(error: unknown) {
   if (error instanceof ServiceError) {
     return jsonError(error.message, error.status);
   }
-  if (error instanceof Error && error.message === "UNAUTHORIZED") {
-    return jsonError("Please sign in to continue.", 401);
+  if (error instanceof Error) {
+    if (error.message === "UNAUTHORIZED") {
+      return jsonError("Please sign in to continue.", 401);
+    }
+    console.error("[API Error]:", error);
+    return jsonError(error.message || "Something went wrong. Please try again.", 400);
   }
-  console.error(error);
+  console.error("[Unknown API Error]:", error);
   return jsonError("Something went wrong. Please try again.", 500);
 }
 
