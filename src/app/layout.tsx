@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     template: "%s · KisanTractor",
   },
   description:
-    "Find nearby tractors and local tractor owners in Nashik. Clear rates, direct payments, and farm work recorded from start to finish.",
+    "Find nearby tractors and local tractor owners. Clear rates, direct payments, and farm work recorded from start to finish.",
   metadataBase: new URL("https://kisantractor.example"),
   openGraph: {
     title: "KisanTractor — Book a Tractor. Directly Connect.",

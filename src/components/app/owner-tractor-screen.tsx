@@ -286,8 +286,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
         images: form.images.length ? form.images : form.image ? [form.image] : undefined,
         status: form.status,
         village: form.village.trim(),
-        district: matchedVillage?.district ?? user.ownerProfile?.district ?? "Nashik",
-        state: matchedVillage?.state ?? user.ownerProfile?.state ?? "Maharashtra",
+        district: matchedVillage?.district ?? user.ownerProfile?.district ?? "",
+        state: matchedVillage?.state ?? user.ownerProfile?.state ?? "",
         lat: formCoords.lat,
         lng: formCoords.lng,
         serviceRadiusKm: Number(form.serviceRadiusKm) || 10,
@@ -351,8 +351,9 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
           <div className="flex items-center gap-2">
             <Badge tone="green" dot>{t("app.ownerTag")}</Badge>
             <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone/70">
-              {user.ownerProfile?.village ?? "Niphad"}
-              {user.ownerProfile?.district ? ` · ${user.ownerProfile.district}` : ""}
+              {[user.ownerProfile?.village, user.ownerProfile?.district]
+                .filter(Boolean)
+                .join(" · ")}
             </span>
           </div>
           <h1 className="mt-2 font-display text-3xl text-forest sm:text-[2.4rem]">
@@ -429,7 +430,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
                 </div>
 
                 <p className="flex items-center gap-1 text-[0.68rem] text-stone">
-                  <MapPin className="size-3" /> {tractor.village}, {tractor.district} ·{" "}
+                  <MapPin className="size-3" />{" "}
+                  {[tractor.village, tractor.district].filter(Boolean).join(", ")} ·{" "}
                   {t("app.serviceRadiusSuffix", { distance: tractor.serviceRadiusKm })}
                 </p>
 

@@ -55,11 +55,11 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
     ? { lat: profile.lat, lng: profile.lng }
     : { lat: VILLAGES[0].lat, lng: VILLAGES[0].lng };
   const [coords, setCoords] = useState(center);
-  const [locationLabel, setLocationLabel] = useState(profile?.village ?? "Niphad");
+  const [locationLabel, setLocationLabel] = useState(profile?.village ?? "");
   const areaLabel =
     [profile?.village, profile?.district, profile?.state]
       .filter(Boolean)
-      .join(" · ") || "Niphad · Nashik · Maharashtra";
+      .join(" · ");
   const pricingLabel = (item: PricingType) =>
     item === "hourly"
       ? t("app.hourly")
@@ -332,7 +332,7 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
                 tractors.length === 1
                   ? t("app.tractorSingular")
                   : t("app.tractorPlural"),
-              location: locationLabel,
+              location: locationLabel || t("app.yourArea"),
             })}</>
           )}
         </p>

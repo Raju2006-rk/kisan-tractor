@@ -720,7 +720,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                 </span>
                 <span>
                   <span className="block text-xs font-semibold text-forest">{t("nav.findTractor")}</span>
-                  <span className="block text-[0.62rem] text-stone">{t("app.localOwnersNearFarm")}</span>
+                  <span className="block text-[0.62rem] text-stone">{t("app.findTractorSub")}</span>
                 </span>
               </span>
               <ArrowRight className="size-3.5 text-stone" />

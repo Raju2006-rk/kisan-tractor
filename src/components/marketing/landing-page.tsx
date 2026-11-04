@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import useSWR from "swr";
 import { motion } from "motion/react";
 import {
   ArrowRight,
@@ -31,15 +30,13 @@ import {
 import { Logo } from "@/components/ui/logo";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { Photo } from "@/components/ui/photo";
-import { Badge, buttonStyles, Card, SectionHeading } from "@/components/ui/primitives";
+import { buttonStyles, Card, SectionHeading } from "@/components/ui/primitives";
 import { PHOTOS, SERVICES } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
-import { formatRupees } from "@/lib/pricing";
-import type { TractorWithOwner } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "#find", key: "nav.findTractor" as const },
+  { href: "/explore", key: "nav.findTractor" as const },
   { href: "#how", key: "nav.howItWorks" as const },
   { href: "#owners", key: "nav.forOwners" as const },
   { href: "#faq", key: "nav.about" as const },
@@ -51,8 +48,6 @@ const marqueeItems = [
   "service.trolley",
   "landing.marquee.directPayments",
   "landing.marquee.noCommission",
-  "landing.marquee.localOwners",
-  "landing.marquee.region",
 ] as const;
 
 function Header() {
@@ -173,7 +168,6 @@ function Hero() {
             {[
               { icon: ShieldCheck, label: t("landing.hero.trust1") },
               { icon: HandCoins, label: t("landing.hero.trust2") },
-              { icon: MapPin, label: t("landing.hero.trust3") },
             ].map((item) => (
               <span key={item.label} className="inline-flex items-center gap-1.5">
                 <item.icon className="size-3.5 text-moss" />
@@ -181,10 +175,6 @@ function Hero() {
               </span>
             ))}
           </div>
-          <p className="mt-6 flex items-center gap-2 text-[0.7rem] font-medium uppercase tracking-[0.14em] text-stone/80">
-            <span className="size-1.5 rounded-full bg-clay" />
-            {t("landing.hero.proof")}
-          </p>
         </motion.div>
 
         <motion.div
@@ -204,15 +194,6 @@ function Hero() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#102b1e]/55 via-transparent to-transparent" />
             </div>
-            <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-4 sm:p-5">
-              <span className="rounded-full border border-forest/10 bg-paper/80 px-3 py-1.5 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-forest backdrop-blur">
-                {t("landing.hero.regionBadge")}
-              </span>
-              <span className="flex items-center gap-1.5 rounded-full border border-forest/10 bg-paper/80 px-3 py-1.5 text-[0.65rem] font-semibold text-forest backdrop-blur">
-                <span className="size-1.5 rounded-full bg-forest pulse-ring" />
-                {t("landing.hero.trust3")}
-              </span>
-            </div>
             <div className="pointer-events-none absolute bottom-4 left-4 right-4 flex flex-wrap items-end justify-between gap-2 sm:bottom-5 sm:left-5 sm:right-5">
               <div className="rounded-2xl border border-forest/10 bg-paper/85 px-3.5 py-2.5 backdrop-blur">
                 <p className="text-[0.6rem] font-bold uppercase tracking-[0.16em] text-stone">
@@ -221,9 +202,6 @@ function Hero() {
                 <p className="mt-0.5 text-xs font-semibold text-forest">
                   {t("landing.hero.pricingLine")}
                 </p>
-              </div>
-              <div className="hidden items-center gap-1.5 rounded-full bg-forest px-3 py-2 text-[0.65rem] font-semibold text-cream sm:flex">
-                <MapPin className="size-3" /> {t("landing.hero.nearby")}
               </div>
             </div>
           </div>
@@ -254,7 +232,6 @@ function Hero() {
           <div className="no-scrollbar flex flex-1 items-center gap-6 overflow-hidden text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-stone/70">
             <span className="hidden sm:inline">{t("landing.hero.trustBar1")}</span>
             <span className="hidden sm:inline">{t("landing.hero.trustBar2")}</span>
-            <span>{t("landing.hero.trust3")}</span>
             <span className="hidden md:inline">{t("landing.hero.trustBar3")}</span>
           </div>
         </div>
@@ -363,7 +340,6 @@ function Services() {
       <div className="container-page">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <SectionHeading
-            eyebrow={t("landing.services.eyebrow")}
             title={t("landing.services.title")}
             body={t("landing.services.subtitle")}
           />
@@ -407,115 +383,6 @@ function Services() {
             </motion.div>
           ))}
         </div>
-      </div>
-    </section>
-  );
-}
-
-function TractorCard({ tractor, priority = false }: { tractor: TractorWithOwner; priority?: boolean }) {
-  const { t } = useI18n();
-  const rates = [
-    tractor.pricing.hourlyEnabled && {
-      label: t("app.hourly"),
-      value: tractor.pricing.hourlyRate,
-      unit: t("common.perHour"),
-    },
-    tractor.pricing.acreEnabled && {
-      label: t("app.perAcre"),
-      value: tractor.pricing.acreRate,
-      unit: t("common.perAcre"),
-    },
-    tractor.pricing.tripEnabled && {
-      label: t("app.perTrip"),
-      value: tractor.pricing.tripRate,
-      unit: t("common.perTrip"),
-    },
-  ].filter(Boolean) as { label: string; value: number; unit: string }[];
-
-  return (
-    <Link
-      href={`/tractors/${tractor.id}`}
-      className="group block overflow-hidden rounded-[1.5rem] border border-line bg-paper shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-soft"
-    >
-      <div className="relative">
-        <Photo
-          src={tractor.image}
-          alt={`${tractor.brand} ${tractor.model}`}
-          className="h-48 w-full"
-          imageClassName="transition duration-700 group-hover:scale-105"
-          sizes="(max-width: 768px) 100vw, 33vw"
-          priority={priority}
-        />
-        <div className="absolute left-3 top-3 flex gap-1.5">
-          <Badge tone="green" dot>
-            {t("common.available")}
-          </Badge>
-          <Badge tone="stone">{tractor.horsepower} HP</Badge>
-        </div>
-        <span className="absolute bottom-3 right-3 rounded-full bg-ink/70 px-2.5 py-1 text-[0.65rem] font-semibold text-cream backdrop-blur">
-          {t("landing.kmFromNashik", { km: tractor.distanceKm })}
-        </span>
-      </div>
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="font-display text-xl text-forest">
-              {tractor.brand} {tractor.model}
-            </h3>
-            <p className="mt-0.5 text-xs text-stone">
-              {tractor.owner.name} · {tractor.village}, {tractor.district}
-            </p>
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-1.5">
-          {rates.map((rate) => (
-            <span
-              key={rate.label}
-              className="rounded-lg border border-line/80 bg-cream/60 px-2 py-1 text-[0.65rem] font-semibold text-forest"
-            >
-              {formatRupees(rate.value)}
-              <span className="font-normal text-stone">{rate.unit}</span>
-            </span>
-          ))}
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function NearbyTractors() {
-  const { t } = useI18n();
-  const { data, isLoading } = useSWR<{ tractors: TractorWithOwner[] }>(
-    // Niphad, Nashik — the service area shown in the section heading.
-    "/api/tractors?lat=20.0833&lng=73.9333",
-  );
-  const tractors = data?.tractors?.slice(0, 3) ?? [];
-
-  return (
-    <section id="find" className="scroll-mt-24 py-16 sm:py-20 lg:py-24">
-      <div className="container-page">
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <SectionHeading
-            eyebrow={t("landing.nearby.eyebrow")}
-            title={t("landing.nearby.title")}
-            body={t("landing.nearby.subtitle")}
-          />
-          <Link href="/explore" className={buttonStyles("primary", "sm", "shrink-0")}>
-            {t("landing.nearby.cta")} <ArrowRight className="size-3.5" />
-          </Link>
-        </div>
-        <div className="mt-9 grid gap-4 md:grid-cols-3">
-          {isLoading
-            ? [0, 1, 2].map((item) => (
-                <div key={item} className="h-80 animate-pulse rounded-[1.5rem] bg-sand/70" />
-              ))
-            : tractors.map((tractor, index) => (
-                <TractorCard key={tractor.id} tractor={tractor} priority={index === 0} />
-              ))}
-        </div>
-        <p className="mt-4 text-center text-[0.7rem] text-stone">
-          {t("landing.nearby.note")}
-        </p>
       </div>
     </section>
   );
@@ -830,9 +697,6 @@ function Footer() {
             <p className="mt-4 max-w-xs text-xs leading-relaxed text-cream/60">
               {t("footer.tagline")}
             </p>
-            <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-cream/10 px-3 py-1.5 text-[0.65rem] text-cream/60">
-              <MapPin className="size-3" /> {t("footer.location")}
-            </p>
           </div>
           <div>
             <p className="text-[0.65rem] font-bold uppercase tracking-[0.18em] text-wheat/80">
@@ -891,7 +755,6 @@ export function LandingPage() {
         <Marquee />
         <HowItWorks />
         <Services />
-        <NearbyTractors />
         <DirectPayment />
         <OwnerSection />
         <IvrSection />
