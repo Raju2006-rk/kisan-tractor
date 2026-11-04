@@ -80,7 +80,7 @@ export default function ExploreMap({
   }
 
   return (
-    <div className="relative overflow-hidden rounded-[1.5rem] border border-line bg-sand shadow-[var(--shadow-card)]">
+    <div className="relative overflow-hidden rounded-3xl border border-line bg-sand shadow-[var(--shadow-card)]">
       {useGoogle ? (
         <GoogleExploreMap
           tractors={tractors}
@@ -92,7 +92,7 @@ export default function ExploreMap({
       )}
 
       {/* Tractors count badge */}
-      <div className="pointer-events-none absolute left-3 top-3 z-[500] flex items-center gap-1.5 rounded-full border border-forest/10 bg-paper/95 px-3 py-1.5 text-[0.65rem] font-semibold text-forest shadow-sm backdrop-blur">
+      <div className="pointer-events-none absolute left-3 top-3 z-500 flex items-center gap-1.5 rounded-full border border-forest/10 bg-paper/95 px-3 py-1.5 text-[0.65rem] font-semibold text-forest shadow-sm backdrop-blur">
         <span className="size-1.5 rounded-full bg-forest pulse-ring" />
         {tractors.length} {tractors.length === 1 ? t("app.tractorSingular") : t("app.tractorPlural")}{" "}
         {t("app.onTheMap")}
@@ -106,7 +106,7 @@ export default function ExploreMap({
         aria-label={t("common.useMyLocation") || "Auto-detect current location"}
         title={t("common.useMyLocation") || "Auto-detect current location"}
         className={cn(
-          "absolute bottom-5 right-4 z-[500] flex size-11 items-center justify-center rounded-full bg-paper border border-black/15 shadow-[0_4px_16px_rgba(0,0,0,0.18)] text-forest transition-all hover:bg-white hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-forest/40 disabled:opacity-70 disabled:cursor-wait",
+          "absolute bottom-5 right-4 z-500 flex size-11 items-center justify-center rounded-full bg-paper border border-black/15 shadow-[0_4px_16px_rgba(0,0,0,0.18)] text-forest transition-all hover:bg-white hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-forest/40 disabled:opacity-70 disabled:cursor-wait",
           isLocating && "animate-pulse cursor-wait",
         )}
       >
@@ -280,7 +280,7 @@ function GoogleExploreMap({
     }
   }, [center.lat, center.lng, ready, tractors, t]);
 
-  return <div ref={containerRef} className="h-[430px] w-full lg:h-[590px]" />;
+  return <div ref={containerRef} className="h-107.5 w-full lg:h-147.5" />;
 }
 
 function LeafletExploreMap({
@@ -407,5 +407,5 @@ function LeafletExploreMap({
     };
   }, [tractors, t]);
 
-  return <div ref={containerRef} className="h-[430px] w-full lg:h-[590px]" />;
+  return <div ref={containerRef} className="h-107.5 w-full lg:h-147.5" />;
 }
