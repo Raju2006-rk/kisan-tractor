@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import {
   createSession,
   findOrCreateUser,
-  isDevOtpEnabledFor,
   isValidMobile,
   normalizeMobile,
   rememberDevice,
