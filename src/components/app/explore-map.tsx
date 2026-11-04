@@ -80,7 +80,7 @@ export default function ExploreMap({
   }
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-line bg-sand shadow-[var(--shadow-card)]">
+    <div className="relative overflow-hidden rounded-3xl border border-line bg-sand shadow-(--shadow-card)">
       {useGoogle ? (
         <GoogleExploreMap
           tractors={tractors}
