@@ -47,7 +47,12 @@ export function AppShell({
   const { push } = useToast();
   const [online, setOnline] = useState(user.ownerProfile?.online ?? false);
   const [statusLoading, setStatusLoading] = useState(false);
-  const [soundOn, setSoundOn] = useState(true);
+  const [soundOn, setSoundOn] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.localStorage.getItem("kt_sound") !== "off";
+    }
+    return true;
+  });
   const seenNotificationIds = useRef<Set<string> | null>(null);
   const { data } = useSWR<{ notifications: Notification[]; unread: number }>(
     "/api/notifications",
@@ -55,12 +60,6 @@ export function AppShell({
   );
 
   const isOwner = user.role === "owner";
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem("kt_sound");
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (stored === "off") setSoundOn(false);
-  }, []);
 
   useEffect(() => {
     const rows = data?.notifications;

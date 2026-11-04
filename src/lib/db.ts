@@ -42,8 +42,10 @@ function normalizeDatabase(value: unknown): Database {
   };
 }
 
+let hasWarnedDatabaseConfig = false;
 function assertDatabaseConfigured() {
-  if (!isSupabaseDatabaseConfigured()) {
+  if (!isSupabaseDatabaseConfigured() && !hasWarnedDatabaseConfig) {
+    hasWarnedDatabaseConfig = true;
     console.warn(
       "[KisanTractor] Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY. Operating with local database.",
     );

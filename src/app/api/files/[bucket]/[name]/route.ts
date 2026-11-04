@@ -88,8 +88,8 @@ export async function GET(
         ? "public, max-age=86400, stale-while-revalidate=604800"
         : "private, no-store, max-age=0";
 
-    const responseBody = fileData instanceof Blob ? fileData : new Uint8Array(fileData);
-    return new Response(responseBody, {
+    const responseBody = fileData instanceof Blob ? fileData : new Uint8Array(fileData.buffer, fileData.byteOffset, fileData.byteLength);
+    return new Response(responseBody as unknown as BodyInit, {
       headers: {
         "Content-Type": contentType,
         "Content-Disposition": `inline; filename="${name}"`,
