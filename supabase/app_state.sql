@@ -44,7 +44,9 @@ values (
     "equipment": [
       { "id": "eq_plough", "name": "Plough", "description": "Deep soil turning and primary tillage", "icon": "plough" },
       { "id": "eq_rotavator", "name": "Rotavator", "description": "Secondary seedbed preparation and fine pulverising", "icon": "rotavator" },
-      { "id": "eq_trolley", "name": "Trolley / Trailer", "description": "Crop hauling, manure transport and heavy farm logistics", "icon": "trolley" }
+      { "id": "eq_trolley", "name": "Trolley / Trailer", "description": "Crop hauling, manure transport and heavy farm logistics", "icon": "trolley" },
+      { "id": "eq_seed_drill", "name": "Seed drill", "description": "Even row sowing", "icon": "seed" },
+      { "id": "eq_sprayer", "name": "Sprayer", "description": "Field spraying equipment", "icon": "spray" }
     ]
   }'::jsonb,
   1

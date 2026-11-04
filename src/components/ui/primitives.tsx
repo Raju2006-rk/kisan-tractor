@@ -208,7 +208,7 @@ export function Field({
 }
 
 const fieldBase =
-  "w-full rounded-xl border border-line bg-paper px-3.5 text-sm text-ink placeholder:text-stone/60 transition focus:border-forest/50 focus:ring-4 focus:ring-forest/8 focus:outline-none disabled:bg-sand/40 disabled:text-stone";
+  "w-full rounded-xl border border-line bg-paper px-3.5 text-sm text-ink placeholder:text-stone/60 transition focus:border-forest/50 focus:ring-4 focus:ring-forest/8 focus:outline-none disabled:bg-sand/40 disabled:text-stone [&::-webkit-calendar-picker-indicator]:hidden";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...props }, ref) {
