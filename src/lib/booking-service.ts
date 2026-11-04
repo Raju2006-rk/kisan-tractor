@@ -1,7 +1,6 @@
 import { randomUUID } from "crypto";
 import { getDb, mutateDb } from "./db";
 import {
-  ACTIVE_STATUSES,
   CANCELLABLE_STATUSES,
   EQUIPMENT_CATALOG,
   LANGUAGES,
@@ -52,13 +51,6 @@ export class ServiceError extends Error {
   }
 }
 
-export function isActiveStatus(status: BookingStatus): boolean {
-  return ACTIVE_STATUSES.includes(status);
-}
-
-export function isTerminalStatus(status: BookingStatus): boolean {
-  return TERMINAL_STATUSES.includes(status);
-}
 
 export function getPricing(db: Database, tractorId: string): Pricing {
   const pricing = db.pricing.find((p) => p.tractorId === tractorId);
@@ -128,9 +120,6 @@ export function getOwnerProfile(db: Database, ownerId: string): OwnerProfile {
   return ensureOwnerProfile(db, ownerId);
 }
 
-export function getFarmerProfile(db: Database, farmerId: string): FarmerProfile {
-  return ensureFarmerProfile(db, farmerId);
-}
 
 export function bookingPartyIds(booking: Booking, db: Database): {
   ownerId: string;

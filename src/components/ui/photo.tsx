@@ -31,12 +31,6 @@ export function Photo({
     setFailed(false);
   }
 
-
-  // valid check
-  void Boolean(
-    src && (src.startsWith("data:") || src.startsWith("blob:")),
-  );
-  void Boolean(src?.startsWith("/api/files/"));
   const valid = Boolean(src) && !failed;
 
   return (

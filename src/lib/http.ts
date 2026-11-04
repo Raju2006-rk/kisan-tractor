@@ -22,7 +22,9 @@ export function handleApiError(error: unknown) {
       return jsonError("Please sign in to continue.", 401);
     }
     console.error("[API Error]:", error);
-    return jsonError(error.message || "Something went wrong. Please try again.", 400);
+    const isProd = process.env.NODE_ENV === "production";
+    const safeMsg = isProd ? "An error occurred. Please try again." : (error.message || "Something went wrong. Please try again.");
+    return jsonError(safeMsg, 400);
   }
   console.error("[Unknown API Error]:", error);
   return jsonError("Something went wrong. Please try again.", 500);
