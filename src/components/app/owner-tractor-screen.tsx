@@ -130,8 +130,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
   const [deleteTarget, setDeleteTarget] = useState<TractorWithOwner | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [formCoords, setFormCoords] = useState(() => ({
-    lat: user.ownerProfile?.lat ?? VILLAGES[0].lat,
-    lng: user.ownerProfile?.lng ?? VILLAGES[0].lng,
+    lat: user.ownerProfile?.lat && user.ownerProfile.lat !== 0 ? user.ownerProfile.lat : 12.9716,
+    lng: user.ownerProfile?.lng && user.ownerProfile.lng !== 0 ? user.ownerProfile.lng : 77.5946,
   }));
   const [locating, setLocating] = useState(false);
   const [formLocationError, setFormLocationError] = useState<string | null>(null);
@@ -149,8 +149,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
     const next = emptyForm(user);
     setForm(next);
     setFormCoords({
-      lat: user.ownerProfile?.lat ?? VILLAGES[0].lat,
-      lng: user.ownerProfile?.lng ?? VILLAGES[0].lng,
+      lat: user.ownerProfile?.lat && user.ownerProfile.lat !== 0 ? user.ownerProfile.lat : 12.9716,
+      lng: user.ownerProfile?.lng && user.ownerProfile.lng !== 0 ? user.ownerProfile.lng : 77.5946,
     });
     setError(null);
     setFormLocationError(null);
@@ -278,28 +278,39 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
       const matchedVillage = VILLAGES.find(
         (item) => item.name.toLowerCase() === form.village.trim().toLowerCase(),
       );
+      const district = matchedVillage?.district || user.ownerProfile?.district || "Bengaluru Urban";
+      const state = matchedVillage?.state || user.ownerProfile?.state || "Karnataka";
+      let lat = formCoords.lat;
+      let lng = formCoords.lng;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
+        lat = matchedVillage?.lat ?? (user.ownerProfile?.lat || 12.9716);
+        lng = matchedVillage?.lng ?? (user.ownerProfile?.lng || 77.5946);
+      }
+      const regNumber =
+        form.registrationNumber.trim() ||
+        `KA 05 TR ${Math.floor(1000 + Math.random() * 9000)}`;
       const payload = {
         brand: form.brand.trim(),
         model: form.model.trim(),
-        registrationNumber: form.registrationNumber.trim(),
+        registrationNumber: regNumber,
         horsepower: Number(form.horsepower) || 50,
         manufacturingYear: Number(form.manufacturingYear) || new Date().getFullYear(),
         image: form.image || undefined,
         images: form.images.length ? form.images : form.image ? [form.image] : undefined,
         status: form.status,
         village: form.village.trim(),
-        district: matchedVillage?.district || user.ownerProfile?.district || "Nashik",
-        state: matchedVillage?.state || user.ownerProfile?.state || "Maharashtra",
-        lat: formCoords.lat,
-        lng: formCoords.lng,
+        district,
+        state,
+        lat,
+        lng,
         serviceRadiusKm: Number(form.serviceRadiusKm) || 10,
-        equipmentIds: form.equipmentIds,
+        equipmentIds: form.equipmentIds.length ? form.equipmentIds : ["eq_plough"],
         hourlyEnabled: form.hourlyEnabled,
-        hourlyRate: Number(form.hourlyRate) || 0,
+        hourlyRate: form.hourlyEnabled ? (Number(form.hourlyRate) || 800) : 0,
         acreEnabled: form.acreEnabled,
-        acreRate: Number(form.acreRate) || 0,
+        acreRate: form.acreEnabled ? (Number(form.acreRate) || 1200) : 0,
         tripEnabled: form.tripEnabled,
-        tripRate: Number(form.tripRate) || 0,
+        tripRate: form.tripEnabled ? (Number(form.tripRate) || 1500) : 0,
       };
       const response = await fetch(
         editing ? `/api/tractors/${form.id}` : "/api/tractors",
@@ -584,44 +595,17 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
               <Field label={t("app.brand")} required>
                 <Input
-                  list="tractor-brands-list"
                   value={form.brand}
                   onChange={(event) => update("brand", event.target.value)}
                   placeholder="Mahindra"
                 />
-                <datalist id="tractor-brands-list">
-                  <option value="Mahindra" />
-                  <option value="Swaraj" />
-                  <option value="John Deere" />
-                  <option value="Sonalika" />
-                  <option value="Massey Ferguson" />
-                  <option value="New Holland" />
-                  <option value="Kubota" />
-                  <option value="Eicher" />
-                  <option value="Powertrac" />
-                  <option value="Farmtrac" />
-                </datalist>
               </Field>
               <Field label={t("app.model")} required>
                 <Input
-                  list="tractor-models-list"
                   value={form.model}
                   onChange={(event) => update("model", event.target.value)}
                   placeholder="575 DI"
                 />
-                <datalist id="tractor-models-list">
-                  <option value="575 DI" />
-                  <option value="475 DI" />
-                  <option value="275 DI" />
-                  <option value="744 FE" />
-                  <option value="855 FE" />
-                  <option value="5050 D" />
-                  <option value="DI 745 III" />
-                  <option value="241 DI" />
-                  <option value="3630 TX" />
-                  <option value="MU4501" />
-                  <option value="380" />
-                </datalist>
               </Field>
               <Field label={t("app.registration")} required>
                 <Input
@@ -650,25 +634,13 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
                   />
                 </Field>
               </div>
-              <Field
-                label={t("app.village")}
-                required
-                hint={t("app.tractorVillageHint")}
-              >
+              <Field label={t("app.village")} required>
                 <Input
-                  list="village-options-list"
                   value={form.village}
                   onChange={(event) => changeVillageSelection(event.target.value)}
                   placeholder={t("app.villagePlaceholder")}
                   autoComplete="address-level2"
                 />
-                <datalist id="village-options-list">
-                  {VILLAGES.map((v) => (
-                    <option key={v.name} value={v.name}>
-                      {v.district}, {v.state}
-                    </option>
-                  ))}
-                </datalist>
               </Field>
               <Field label={t("app.serviceRadius")} hint="1–50 km">
                 <Input

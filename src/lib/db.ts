@@ -27,10 +27,18 @@ function normalizeDatabase(value: unknown): Database {
   const initial = buildInitialDatabase();
   if (!value || typeof value !== "object") return initial;
   const raw = value as Partial<Database>;
+  const baseEquipment = Array.isArray(raw.equipment) && raw.equipment.length > 0
+    ? [...raw.equipment]
+    : [...initial.equipment];
+  for (const catEq of initial.equipment) {
+    if (!baseEquipment.some((e) => e.id === catEq.id)) {
+      baseEquipment.push(catEq);
+    }
+  }
   return {
     ...initial,
     ...raw,
-    equipment: raw.equipment?.length ? raw.equipment : initial.equipment,
+    equipment: baseEquipment,
   };
 }
 
