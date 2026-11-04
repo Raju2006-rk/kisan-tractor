@@ -99,7 +99,7 @@ export function Card({
   return (
     <Tag
       className={cn(
-        "rounded-[1.5rem] border border-line/80 bg-paper shadow-[var(--shadow-card)]",
+        "rounded-3xl border border-line/80 bg-paper shadow-[var(--shadow-card)]",
         className,
       )}
     >
@@ -339,7 +339,7 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-line bg-paper/60 px-6 py-12 text-center",
+        "flex flex-col items-center justify-center rounded-3xl border border-dashed border-line bg-paper/60 px-6 py-12 text-center",
         className,
       )}
     >
@@ -417,7 +417,7 @@ export function Modal({
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[1200] flex items-end justify-center sm:items-center">
+    <div className="fixed inset-0 z-1200 flex items-end justify-center sm:items-center">
       <button
         type="button"
         aria-label="Close dialog"
@@ -429,7 +429,7 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          "relative z-10 flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-[1.75rem] border border-line bg-paper shadow-soft sm:rounded-[1.75rem]",
+          "relative z-10 flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-xl2 border border-line bg-paper shadow-soft sm:rounded-xl2",
           size === "sm" && "sm:max-w-md",
           size === "md" && "sm:max-w-lg",
           size === "lg" && "sm:max-w-2xl",

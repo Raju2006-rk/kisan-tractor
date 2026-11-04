@@ -358,7 +358,7 @@ function Services() {
             >
               <Link
                 href={`/explore?service=${service.id}`}
-                className="group block overflow-hidden rounded-[1.5rem] border border-line bg-paper shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-soft"
+                className="group block overflow-hidden rounded-3xl border border-line bg-paper shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-soft"
               >
                 <Photo
                   src={service.image}
@@ -428,7 +428,7 @@ function DirectPayment() {
         </div>
 
         <div className="relative">
-          <div className="rounded-[1.75rem] border border-cream/15 bg-cream p-5 text-ink shadow-[0_30px_70px_-30px_rgba(0,0,0,0.5)] sm:p-6">
+          <div className="rounded-xl2 border border-cream/15 bg-cream p-5 text-ink shadow-[0_30px_70px_-30px_rgba(0,0,0,0.5)] sm:p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-stone">
@@ -587,7 +587,7 @@ function IvrSection() {
                 {t("landing.ivr.body")}
               </p>
             </div>
-            <div className="rounded-[1.5rem] border border-forest/10 bg-paper/75 p-5 backdrop-blur">
+            <div className="rounded-3xl border border-forest/10 bg-paper/75 p-5 backdrop-blur">
               <div className="flex items-center justify-between">
                 <p className="text-[0.62rem] font-bold uppercase tracking-[0.16em] text-stone">
                   {t("landing.ivr.flowTitle")}

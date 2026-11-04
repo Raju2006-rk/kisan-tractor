@@ -178,7 +178,7 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
         </div>
       </div>
 
-      <div className="rounded-[1.5rem] border border-line/80 bg-paper p-4 shadow-[var(--shadow-card)] sm:p-5">
+      <div className="rounded-3xl border border-line/80 bg-paper p-4 shadow-[var(--shadow-card)] sm:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <label className="flex h-11 flex-1 items-center gap-2 rounded-xl border border-line bg-cream/50 px-3.5 focus-within:border-forest/40 focus-within:ring-4 focus-within:ring-forest/8">
             <Search className="size-4 shrink-0 text-stone/60" />

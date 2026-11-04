@@ -122,7 +122,7 @@ export function TractorDetailScreen({
 
       <div className="grid gap-5 lg:grid-cols-[1.55fr_0.85fr] lg:items-start">
         <div className="space-y-5">
-          <div className="relative overflow-hidden rounded-[1.75rem] border border-line bg-sand shadow-[var(--shadow-card)]">
+          <div className="relative overflow-hidden rounded-xl2 border border-line bg-sand shadow-[var(--shadow-card)]">
             <Photo
               src={tractor.image}
               alt={`${tractor.brand} ${tractor.model}`}
