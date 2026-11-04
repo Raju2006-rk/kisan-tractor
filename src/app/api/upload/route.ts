@@ -19,8 +19,6 @@ const PNG: ImageKind = { mime: "image/png", extension: "png" };
 const WEBP: ImageKind = { mime: "image/webp", extension: "webp" };
 const AVIF: ImageKind = { mime: "image/avif", extension: "avif" };
 
-const ALLOWED_MIME = new Set([JPEG.mime, PNG.mime, WEBP.mime, AVIF.mime]);
-
 /**
  * Trust the file signature, not the browser-supplied MIME type. This rejects
  * SVG/HTML masquerading as an image as well as truncated or empty files.
@@ -107,9 +105,6 @@ export async function POST(request: Request) {
     if (!(file instanceof File)) {
       return jsonError("Please choose an image to upload.", 400);
     }
-    if (!ALLOWED_MIME.has(file.type)) {
-      return jsonError("Please upload a JPG, PNG, WebP or AVIF image.", 400);
-    }
     if (file.size <= 0) {
       return jsonError("The selected image is empty.", 400);
     }
@@ -119,7 +114,7 @@ export async function POST(request: Request) {
     const purpose = form.get("purpose") === "document" ? "document" : "photo";
     const bytes = Buffer.from(await file.arrayBuffer());
     const kind = detectImage(bytes);
-    if (!kind || kind.mime !== file.type) {
+    if (!kind) {
       return jsonError("The file is not a valid JPG, PNG, WebP or AVIF image.", 400);
     }
     const fileName = `${fileOwnerMarker(user.id)}-${randomUUID()}.${kind.extension}`;

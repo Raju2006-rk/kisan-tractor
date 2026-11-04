@@ -1660,12 +1660,12 @@ function safeText(value: unknown, maxLength = 200): string {
 }
 
 function isSafeImageValue(value: string): boolean {
-  if (!value || value.length > 14 * 1024 * 1024) return false;
+  if (!value || value.length > 30 * 1024 * 1024) return false;
   if (/^\/uploads\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)) return true;
-  if (/^\/api\/files\/app-documents\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)) {
+  if (/^\/api\/files\/(app-documents|app-files)\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)) {
     return true;
   }
-  if (/^data:image\/(jpeg|png|webp|avif);base64,[A-Za-z0-9+/=]+$/i.test(value)) {
+  if (/^data:image\/(jpeg|png|webp|avif);base64,[A-Za-z0-9+/=\s]+$/i.test(value)) {
     return true;
   }
   try {

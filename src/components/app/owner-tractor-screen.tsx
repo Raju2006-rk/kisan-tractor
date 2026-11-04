@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import {
   Camera,
@@ -33,7 +33,12 @@ import {
   buttonStyles,
 } from "@/components/ui/primitives";
 import { useToast } from "@/components/providers/app-providers";
-import { EQUIPMENT_CATALOG, VILLAGES } from "@/lib/constants";
+import {
+  EQUIPMENT_CATALOG,
+  TRACTOR_BRANDS,
+  TRACTOR_BRANDS_AND_MODELS,
+  VILLAGES,
+} from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 import { formatRupees } from "@/lib/pricing";
 import type { SessionUser, TractorWithOwner } from "@/lib/types";
@@ -67,8 +72,8 @@ function emptyForm(user: SessionUser): TractorForm {
   const village =
     VILLAGES.find((item) => item.name === profileVillage) ?? VILLAGES[0];
   return {
-    brand: "",
-    model: "",
+    brand: "Mahindra",
+    model: "575 DI",
     registrationNumber: "",
     horsepower: "50",
     manufacturingYear: String(new Date().getFullYear()),
@@ -140,6 +145,13 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
   const cameraRef = useRef<HTMLInputElement>(null);
 
   const editing = Boolean(form.id);
+
+  const availableModels = useMemo(() => {
+    if (form.brand && TRACTOR_BRANDS_AND_MODELS[form.brand]) {
+      return TRACTOR_BRANDS_AND_MODELS[form.brand];
+    }
+    return TRACTOR_BRANDS_AND_MODELS["Mahindra"] ?? [];
+  }, [form.brand]);
 
   function update<K extends keyof TractorForm>(key: K, value: TractorForm[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -239,18 +251,40 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
     setUploading(true);
     setError(null);
     try {
-      const body = new FormData();
-      body.append("file", file);
-      const response = await fetch("/api/upload", { method: "POST", body });
-      const result = (await response.json()) as { error?: string; url?: string };
-      if (!response.ok || !result.url) {
-        throw new Error(result.error ?? t("app.couldNotUploadPhoto"));
-      }
+      // 1. Read file as base64 data URL immediately for instant preview & guaranteed offline persistence
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // Update form image immediately so owner sees their photo right away
       setForm((current) => ({
         ...current,
-        image: result.url as string,
-        images: [result.url as string, ...current.images.filter((item) => item !== result.url)],
+        image: dataUrl,
+        images: [dataUrl, ...current.images.filter((item) => item !== dataUrl)],
       }));
+
+      // 2. Upload to server
+      try {
+        const body = new FormData();
+        body.append("file", file);
+        const response = await fetch("/api/upload", { method: "POST", body });
+        const result = (await response.json()) as { error?: string; url?: string };
+        if (response.ok && result.url) {
+          setForm((current) => ({
+            ...current,
+            image: result.url as string,
+            images: [
+              result.url as string,
+              ...current.images.filter((item) => item !== result.url && item !== dataUrl),
+            ],
+          }));
+        }
+      } catch (uploadNetErr) {
+        console.warn("Upload network error, retaining data URL:", uploadNetErr);
+      }
       push(t("app.photoUploaded"), "success");
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : t("app.couldNotUploadPhoto"));
@@ -594,18 +628,44 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
             <h3 className="text-sm font-semibold text-forest">{t("app.tractorDetails")}</h3>
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
               <Field label={t("app.brand")} required>
-                <Input
+                <Select
                   value={form.brand}
-                  onChange={(event) => update("brand", event.target.value)}
-                  placeholder="Mahindra"
-                />
+                  onChange={(event) => {
+                    const newBrand = event.target.value;
+                    const models = TRACTOR_BRANDS_AND_MODELS[newBrand] ?? [];
+                    setForm((current) => ({
+                      ...current,
+                      brand: newBrand,
+                      model: models[0] ?? current.model,
+                    }));
+                  }}
+                >
+                  <option value="" disabled>-- {t("app.brand")} --</option>
+                  {TRACTOR_BRANDS.map((brand) => (
+                    <option key={brand} value={brand}>
+                      {brand}
+                    </option>
+                  ))}
+                  {form.brand && !TRACTOR_BRANDS.includes(form.brand) ? (
+                    <option value={form.brand}>{form.brand}</option>
+                  ) : null}
+                </Select>
               </Field>
               <Field label={t("app.model")} required>
-                <Input
+                <Select
                   value={form.model}
                   onChange={(event) => update("model", event.target.value)}
-                  placeholder="575 DI"
-                />
+                >
+                  <option value="" disabled>-- {t("app.model")} --</option>
+                  {availableModels.map((model) => (
+                    <option key={model} value={model}>
+                      {model}
+                    </option>
+                  ))}
+                  {form.model && !availableModels.includes(form.model) ? (
+                    <option value={form.model}>{form.model}</option>
+                  ) : null}
+                </Select>
               </Field>
               <Field label={t("app.registration")} required>
                 <Input

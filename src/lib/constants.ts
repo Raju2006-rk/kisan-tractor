@@ -224,6 +224,99 @@ export const VILLAGES = [
   },
 ];
 
+export const TRACTOR_BRANDS_AND_MODELS: Record<string, string[]> = {
+  Mahindra: [
+    "575 DI",
+    "475 DI",
+    "275 DI TU",
+    "585 DI Sarpanch",
+    "Novo 605 DI",
+    "Novo 755 DI",
+    "Yuvo Tech+ 575",
+    "Yuvo Tech+ 415",
+    "Jivo 245 DI",
+  ],
+  Swaraj: [
+    "744 FE",
+    "855 FE",
+    "735 FE",
+    "963 FE",
+    "742 FE",
+    "Target 630",
+  ],
+  "John Deere": [
+    "5050 D",
+    "5105",
+    "5310",
+    "5210",
+    "5405",
+    "3028 EN",
+  ],
+  Sonalika: [
+    "DI 745 III",
+    "Sikander DI 750 III",
+    "DI 35",
+    "Tiger 55",
+    "DI 60",
+    "WT 60",
+  ],
+  "Massey Ferguson": [
+    "241 DI",
+    "1035 DI",
+    "245 DI",
+    "9500",
+    "7250 PowerUp",
+  ],
+  "New Holland": [
+    "3630 TX",
+    "3230 NX",
+    "3600-2 TX",
+    "Excel 4710",
+    "5620 TX Plus",
+  ],
+  Kubota: [
+    "MU4501",
+    "MU5501",
+    "B2441",
+    "B2741",
+    "L4508",
+  ],
+  Eicher: [
+    "380",
+    "242",
+    "333",
+    "485",
+    "557",
+  ],
+  Powertrac: [
+    "Euro 50",
+    "439 Plus",
+    "Euro 45",
+    "Euro 60",
+  ],
+  Farmtrac: [
+    "60 PowerMaxx",
+    "45 Classic",
+    "6055 PowerMaxx",
+  ],
+  Captain: [
+    "280 DI",
+    "250 DI",
+    "200 DI",
+  ],
+  Escorts: [
+    "Steeltrac",
+    "Farmtrac 60",
+    "Powertrac 439",
+  ],
+  Other: [
+    "Standard Model",
+    "Custom Model",
+  ],
+};
+
+export const TRACTOR_BRANDS = Object.keys(TRACTOR_BRANDS_AND_MODELS);
+
 export const PAYMENT_METHODS: {
   id: PaymentMethod;
   label: string;
