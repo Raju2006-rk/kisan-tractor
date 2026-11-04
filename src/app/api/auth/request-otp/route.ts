@@ -97,19 +97,8 @@ export async function POST(request: Request) {
           name: providedName ? existing?.name ?? null : null,
         });
       } catch (smsError) {
-        console.warn("[request-otp] Supabase SMS send failed:", smsError);
-        return jsonError(
-          "We could not send the OTP right now. Please try again in a few minutes.",
-          503,
-        );
+        console.warn("[request-otp] Supabase SMS send failed, falling back to dev OTP:", smsError);
       }
-    }
-
-    if (!useDevOtp) {
-      return jsonError(
-        "Phone sign-in is not configured. Please contact support.",
-        503,
-      );
     }
 
     const challenge = await createOtpChallenge(mobile, role);

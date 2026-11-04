@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import type { Map as LeafletMap } from "leaflet";
+import { Loader2 } from "lucide-react";
 import {
   googleMapsProviderEnabled,
   loadGoogleMaps,
@@ -15,6 +16,7 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { formatRupees } from "@/lib/pricing";
 import type { TractorWithOwner } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 function escapeHtml(value: string) {
   return value
@@ -38,13 +40,45 @@ function rateLabel(tractor: TractorWithOwner) {
 export default function ExploreMap({
   tractors,
   center,
+  onLocate,
+  locating = false,
 }: {
   tractors: TractorWithOwner[];
   center: { lat: number; lng: number };
+  onLocate?: () => void;
+  locating?: boolean;
 }) {
   const { t } = useI18n();
   const [googleFailed, setGoogleFailed] = useState(false);
+  const [internalLocating, setInternalLocating] = useState(false);
   const useGoogle = googleMapsProviderEnabled() && !googleFailed;
+  const isLocating = locating || internalLocating;
+
+  function handleLocate() {
+    if (onLocate) {
+      onLocate();
+      return;
+    }
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      alert("Location requires HTTPS or localhost.");
+      return;
+    }
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+    setInternalLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        setInternalLocating(false);
+      },
+      (error) => {
+        setInternalLocating(false);
+        console.warn("[ExploreMap] Geolocation failed:", error);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
+    );
+  }
 
   return (
     <div className="relative overflow-hidden rounded-[1.5rem] border border-line bg-sand shadow-[var(--shadow-card)]">
@@ -57,11 +91,47 @@ export default function ExploreMap({
       ) : (
         <LeafletExploreMap tractors={tractors} center={center} />
       )}
+
+      {/* Tractors count badge */}
       <div className="pointer-events-none absolute left-3 top-3 z-[500] flex items-center gap-1.5 rounded-full border border-forest/10 bg-paper/95 px-3 py-1.5 text-[0.65rem] font-semibold text-forest shadow-sm backdrop-blur">
         <span className="size-1.5 rounded-full bg-forest pulse-ring" />
         {tractors.length} {tractors.length === 1 ? t("app.tractorSingular") : t("app.tractorPlural")}{" "}
         {t("app.onTheMap")}
       </div>
+
+      {/* Floating Auto-Detect Location Button (Image 2) */}
+      <button
+        type="button"
+        onClick={handleLocate}
+        disabled={isLocating}
+        aria-label={t("common.useMyLocation") || "Auto-detect current location"}
+        title={t("common.useMyLocation") || "Auto-detect current location"}
+        className={cn(
+          "absolute bottom-5 right-4 z-[500] flex size-11 items-center justify-center rounded-full bg-paper border border-black/15 shadow-[0_4px_16px_rgba(0,0,0,0.18)] text-forest transition-all hover:bg-white hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-forest/40 disabled:opacity-70 disabled:cursor-wait",
+          isLocating && "animate-pulse cursor-wait",
+        )}
+      >
+        {isLocating ? (
+          <Loader2 className="size-5 animate-spin text-forest" />
+        ) : (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="size-5 text-forest"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="7" />
+            <line x1="12" y1="2" x2="12" y2="5" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+            <line x1="2" y1="12" x2="5" y2="12" />
+            <line x1="19" y1="12" x2="22" y2="12" />
+          </svg>
+        )}
+      </button>
     </div>
   );
 }
@@ -77,6 +147,7 @@ function GoogleExploreMap({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<GoogleMap | null>(null);
+  const userMarkerRef = useRef<GoogleMarker | null>(null);
   const markersRef = useRef<GoogleMarker[]>([]);
   const infoRef = useRef<GoogleInfoWindow | null>(null);
   const [ready, setReady] = useState(false);
@@ -106,8 +177,16 @@ function GoogleExploreMap({
           });
           mapRef.current = map;
           infoRef.current = new google.maps.InfoWindow();
+
+          // User location marker
+          userMarkerRef.current = new google.maps.Marker({
+            position: center,
+            map,
+            title: t("common.currentLocation"),
+            zIndex: 999,
+          });
+
           setReady(true);
-          // Backup for a key that is rejected without Google's error overlay.
           healthTimer = window.setTimeout(() => {
             if (
               !cancelled &&
@@ -131,14 +210,24 @@ function GoogleExploreMap({
       stopWatching();
       markersRef.current.forEach((marker) => marker.setMap(null));
       markersRef.current = [];
+      userMarkerRef.current?.setMap(null);
+      userMarkerRef.current = null;
       infoRef.current?.close();
       infoRef.current = null;
       mapRef.current = null;
       setReady(false);
     };
-    // The map shell is created once; later effects keep markers and centre fresh.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Update center when user's location changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    map.panTo(center);
+    map.setZoom(13);
+    userMarkerRef.current?.setPosition(center);
+  }, [center.lat, center.lng, ready]);
 
   useEffect(() => {
     const google = typeof window !== "undefined" ? window.google : undefined;
@@ -204,6 +293,7 @@ function LeafletExploreMap({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
+  const userMarkerRef = useRef<import("leaflet").Marker | null>(null);
   const markersRef = useRef<import("leaflet").LayerGroup | null>(null);
   const { t } = useI18n();
 
@@ -224,17 +314,23 @@ function LeafletExploreMap({
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       }).addTo(map);
 
-      L.control.zoom({ position: "bottomright" }).addTo(map);
+      // Position zoom controls in top-right so bottom-right is dedicated to locate button
+      L.control.zoom({ position: "topright" }).addTo(map);
 
+      // User current location pulsing pin
       const youIcon = L.divIcon({
         className: "",
-        html: `<span style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:999px;background:#163b2a;border:3px solid #f7f2e6;box-shadow:0 6px 18px -6px rgba(22,59,42,.7);color:#e2c88c;font-size:15px;">⌂</span>`,
-        iconSize: [34, 34],
-        iconAnchor: [17, 17],
+        html: `<div style="position:relative;display:flex;align-items:center;justify-content:center;width:40px;height:40px;">
+          <span style="position:absolute;width:100%;height:100%;border-radius:999px;background:rgba(22,59,42,0.25);animation:ping 2s cubic-bezier(0,0,0.2,1) infinite;"></span>
+          <span style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:999px;background:#163b2a;border:3px solid #f7f2e6;box-shadow:0 6px 18px -6px rgba(22,59,42,.7);color:#e2c88c;font-size:15px;position:relative;">⌂</span>
+        </div>`,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
       });
-      L.marker([center.lat, center.lng], { icon: youIcon, zIndexOffset: 500 })
+      const marker = L.marker([center.lat, center.lng], { icon: youIcon, zIndexOffset: 500 })
         .addTo(map)
         .bindTooltip(t("common.currentLocation"), { direction: "top", offset: [0, -14] });
+      userMarkerRef.current = marker;
 
       markersRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
@@ -242,12 +338,22 @@ function LeafletExploreMap({
 
     return () => {
       cancelled = true;
+      userMarkerRef.current = null;
       markersRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Update center when farmer's GPS location is detected
+  useEffect(() => {
+    if (!mapRef.current) return;
+    mapRef.current.flyTo([center.lat, center.lng], 13, { duration: 1.2 });
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setLatLng([center.lat, center.lng]);
+    }
+  }, [center.lat, center.lng]);
 
   useEffect(() => {
     let cancelled = false;

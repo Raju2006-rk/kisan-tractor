@@ -179,7 +179,7 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
             size="sm"
             onClick={useMyLocation}
             loading={locating}
-            className="hidden sm:inline-flex"
+            className="inline-flex"
           >
             <LocateFixed className="size-3.5" />
             {locating ? t("common.locating") : t("common.useMyLocation")}
@@ -354,7 +354,7 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
           }
         />
       ) : view === "map" ? (
-        <ExploreMap tractors={tractors} center={coords} />
+        <ExploreMap tractors={tractors} center={coords} onLocate={useMyLocation} locating={locating} />
       ) : isLoading ? (
         <div className="space-y-3">
           {[0, 1, 2, 3].map((item) => (

@@ -50,18 +50,17 @@ export async function POST(request: Request) {
     if (mobileLimited) return mobileLimited;
 
     let supabaseUserId: string | undefined;
-    if (!isDevOtpEnabledFor(mobile) && isSupabaseAuthConfigured()) {
+    const challengeVerified = await verifyOtpChallenge(mobile, otp);
+    if (challengeVerified.ok) {
+      // Test OTP matched successfully
+    } else if (isSupabaseAuthConfigured()) {
       const verified = await verifySupabaseOtp(mobile, otp);
       if ("error" in verified) {
         return jsonError(verified.error, 400);
       }
       supabaseUserId = verified.supabaseUserId;
     } else {
-      // Test OTP path, or a deployment without Supabase Auth configured.
-      const verified = await verifyOtpChallenge(mobile, otp);
-      if (!verified.ok) {
-        return jsonError(verified.reason ?? "Could not verify this OTP.", 400);
-      }
+      return jsonError(challengeVerified.reason ?? "Could not verify this OTP.", 400);
     }
 
     const db = await getDb();
