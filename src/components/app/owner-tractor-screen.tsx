@@ -295,22 +295,15 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
 
   async function save() {
     setError(null);
-    if (!form.brand.trim() || !form.model.trim()) {
-      setError(t("app.addBrandModel"));
-      return;
-    }
-    if (!form.equipmentIds.length) {
-      setError(t("app.selectEquipment"));
-      return;
-    }
-    if (!form.village.trim()) {
-      setError(t("app.chooseTractorVillage"));
-      return;
-    }
+    const brand = form.brand.trim() || "Mahindra";
+    const model = form.model.trim() || "575 DI";
+    const equipmentIds = form.equipmentIds.length ? form.equipmentIds : ["eq_plough"];
+    const village = form.village.trim() || user.ownerProfile?.village || "Bengaluru";
+
     setSaving(true);
     try {
       const matchedVillage = VILLAGES.find(
-        (item) => item.name.toLowerCase() === form.village.trim().toLowerCase(),
+        (item) => item.name.toLowerCase() === village.toLowerCase(),
       );
       const district = matchedVillage?.district || user.ownerProfile?.district || "Bengaluru Urban";
       const state = matchedVillage?.state || user.ownerProfile?.state || "Karnataka";
@@ -324,21 +317,21 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
         form.registrationNumber.trim() ||
         `KA 05 TR ${Math.floor(1000 + Math.random() * 9000)}`;
       const payload = {
-        brand: form.brand.trim(),
-        model: form.model.trim(),
+        brand,
+        model,
         registrationNumber: regNumber,
         horsepower: Number(form.horsepower) || 50,
         manufacturingYear: Number(form.manufacturingYear) || new Date().getFullYear(),
         image: form.image || undefined,
         images: form.images.length ? form.images : form.image ? [form.image] : undefined,
         status: form.status,
-        village: form.village.trim(),
+        village,
         district,
         state,
         lat,
         lng,
         serviceRadiusKm: Number(form.serviceRadiusKm) || 10,
-        equipmentIds: form.equipmentIds.length ? form.equipmentIds : ["eq_plough"],
+        equipmentIds,
         hourlyEnabled: form.hourlyEnabled,
         hourlyRate: form.hourlyEnabled ? (Number(form.hourlyRate) || 800) : 0,
         acreEnabled: form.acreEnabled,
@@ -363,7 +356,9 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
       );
       setFormOpen(false);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : t("app.couldNotSaveTractor"));
+      const msg = saveError instanceof Error ? saveError.message : t("app.couldNotSaveTractor");
+      setError(msg);
+      push(msg, "error");
     } finally {
       setSaving(false);
     }

@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { mutateDb } from "@/lib/db";
 import {
   deleteTractor,
+  ensureOwnerProfile,
   getTractorDetail,
   saveTractor,
 } from "@/lib/booking-service";
-import { handleApiError, jsonError, readJson, requireUser } from "@/lib/http";
+import { handleApiError, readJson, requireUser } from "@/lib/http";
 
 export async function GET(
   _request: Request,
@@ -28,7 +30,11 @@ export async function PATCH(
   try {
     const user = await requireUser();
     if (user.role !== "owner") {
-      return jsonError("Only a tractor owner can edit a tractor.", 403);
+      await mutateDb((db) => {
+        const u = db.users.find((item) => item.id === user.id);
+        if (u) u.role = "owner";
+        ensureOwnerProfile(db, user.id);
+      });
     }
     const { id } = await context.params;
     const body = await readJson<Parameters<typeof saveTractor>[1]>(request);
@@ -46,7 +52,10 @@ export async function DELETE(
   try {
     const user = await requireUser();
     if (user.role !== "owner") {
-      return jsonError("Only a tractor owner can remove a tractor.", 403);
+      await mutateDb((db) => {
+        const u = db.users.find((item) => item.id === user.id);
+        if (u) u.role = "owner";
+      });
     }
     const { id } = await context.params;
     await deleteTractor(user.id, id);

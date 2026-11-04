@@ -1025,7 +1025,6 @@ export function BookingWizard({
                   <Field
                     label={t("app.village")}
                     required
-                    hint={t("app.villageMapHint")}
                   >
                     <Input
                       value={villageName}

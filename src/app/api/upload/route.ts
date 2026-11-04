@@ -143,12 +143,10 @@ export async function POST(request: Request) {
                 url: `/api/files/${PRIVATE_BUCKET}/${fileName}`,
               });
             }
-            const { data: publicData } = supabase.storage
-              .from(bucket)
-              .getPublicUrl(fileName);
-            if (publicData?.publicUrl) {
-              return NextResponse.json({ url: publicData.publicUrl });
-            }
+            // Stream uploaded tractor/profile photos reliably through our server endpoint
+            return NextResponse.json({
+              url: `/api/files/${PUBLIC_BUCKET}/${fileName}`,
+            });
           } else {
             console.warn("Supabase storage error:", error.message);
           }

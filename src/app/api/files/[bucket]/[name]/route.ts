@@ -1,3 +1,5 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import { getDb } from "@/lib/db";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { isOwnedFileName } from "@/lib/auth";
@@ -50,10 +52,26 @@ export async function GET(
       }
     }
 
-    const { data, error } = await getSupabaseAdmin()
-      .storage.from(bucket)
-      .download(name);
-    if (error || !data) return jsonError("File not found.", 404);
+    let fileData: Blob | Buffer | Uint8Array | null = null;
+    try {
+      const { data, error } = await getSupabaseAdmin()
+        .storage.from(bucket)
+        .download(name);
+      if (!error && data) {
+        fileData = data;
+      }
+    } catch {
+      // Supabase download failed or offline; check local filesystem fallback
+    }
+
+    if (!fileData) {
+      try {
+        const localPath = path.join(process.cwd(), "public", "uploads", name);
+        fileData = await fs.readFile(localPath);
+      } catch {
+        return jsonError("File not found.", 404);
+      }
+    }
 
     const extension = name.split(".").pop()?.toLowerCase();
     const contentType =
@@ -65,12 +83,18 @@ export async function GET(
             ? "image/avif"
             : "image/jpeg";
 
-    return new Response(data, {
+    const cacheHeader =
+      bucket === "app-files"
+        ? "public, max-age=86400, stale-while-revalidate=604800"
+        : "private, no-store, max-age=0";
+
+    const responseBody = fileData instanceof Blob ? fileData : new Uint8Array(fileData);
+    return new Response(responseBody, {
       headers: {
         "Content-Type": contentType,
         "Content-Disposition": `inline; filename="${name}"`,
         "Content-Security-Policy": "default-src 'none'; sandbox",
-        "Cache-Control": "private, no-store, max-age=0",
+        "Cache-Control": cacheHeader,
         "X-Content-Type-Options": "nosniff",
       },
     });

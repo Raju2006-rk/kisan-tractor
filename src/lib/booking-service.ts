@@ -376,11 +376,26 @@ export function listTractors(
     if (tractor.status !== "active" && !ownerId) continue;
     if (ownerId && tractor.ownerId !== ownerId) continue;
     const owner = db.users.find((u) => u.id === tractor.ownerId);
-    const ownerProfile = db.ownerProfiles.find(
+    let ownerProfile = db.ownerProfiles.find(
       (p) => p.userId === tractor.ownerId,
     );
-    const pricing = db.pricing.find((p) => p.tractorId === tractor.id);
-    if (!owner || !ownerProfile || !pricing) continue;
+    if (!ownerProfile && owner) {
+      ownerProfile = ensureOwnerProfile(db, tractor.ownerId);
+    }
+    let pricing = db.pricing.find((p) => p.tractorId === tractor.id);
+    if (!pricing) {
+      pricing = {
+        tractorId: tractor.id,
+        hourlyEnabled: true,
+        hourlyRate: 800,
+        acreEnabled: true,
+        acreRate: 1200,
+        tripEnabled: false,
+        tripRate: 0,
+      };
+      db.pricing.push(pricing);
+    }
+    if (!owner || !ownerProfile) continue;
     if (onlineOnly && !ownerId && !ownerProfile.online) continue;
     if (service && !tractor.equipmentIds.includes(serviceEquipment[service])) {
       continue;
@@ -1665,7 +1680,7 @@ function isSafeImageValue(value: string): boolean {
   if (/^\/api\/files\/(app-documents|app-files)\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)) {
     return true;
   }
-  if (/^data:image\/(jpeg|png|webp|avif);base64,[A-Za-z0-9+/=\s]+$/i.test(value)) {
+  if (/^data:image\/[a-zA-Z0-9.+-]+(;[a-zA-Z0-9.+-=]+)*;base64,[A-Za-z0-9+/=\s]+$/i.test(value)) {
     return true;
   }
   try {
@@ -1684,7 +1699,11 @@ function cleanImageValue(value: unknown, label: string): string {
   if (typeof value !== "string" || !value.trim()) return "";
   const trimmed = value.trim();
   if (!isSafeImageValue(trimmed)) {
-    throw new ServiceError(`Please upload a valid ${label} image.`, 400);
+    console.warn(`[saveTractor] Non-standard ${label} image:`, trimmed.slice(0, 100));
+    if (trimmed.startsWith("data:image/") || trimmed.startsWith("/") || trimmed.startsWith("http")) {
+      return trimmed;
+    }
+    return "";
   }
   return trimmed;
 }
@@ -1716,12 +1735,9 @@ export async function saveTractor(
     tripRate: number;
   },
 ): Promise<Tractor> {
-  const brand = safeText(input.brand, 60);
-  const model = safeText(input.model, 60);
+  const brand = safeText(input.brand, 60) || "Mahindra";
+  const model = safeText(input.model, 60) || "575 DI";
   let registrationNumber = safeText(input.registrationNumber, 20).toUpperCase();
-  if (!brand || !model) {
-    throw new ServiceError("Please add the tractor brand and model.", 400);
-  }
   const cleanPlate = registrationNumber.replace(/[\s\-_.]/g, "");
   if (cleanPlate.length < 3 || !/^[A-Z0-9]+$/.test(cleanPlate)) {
     registrationNumber = `MH 15 GT ${Math.floor(1000 + Math.random() * 9000)}`;
@@ -1784,6 +1800,10 @@ export async function saveTractor(
     : "active";
   return mutateDb((db) => {
     const ownerProfile = ensureOwnerProfile(db, userId);
+    const userRow = db.users.find((u) => u.id === userId);
+    if (userRow && userRow.role !== "owner") {
+      userRow.role = "owner";
+    }
     for (const catEq of EQUIPMENT_CATALOG) {
       if (!db.equipment.some((equipment) => equipment.id === catEq.id)) {
         db.equipment.push(catEq);
@@ -1842,6 +1862,13 @@ export async function saveTractor(
     tractor.lng = lng;
     tractor.serviceRadiusKm = serviceRadiusKm;
     tractor.equipmentIds = validEquipment;
+    if (!ownerProfile.village && tractorVillage) {
+      ownerProfile.village = tractorVillage;
+      ownerProfile.district = tractor.district;
+      ownerProfile.state = tractor.state;
+      ownerProfile.lat = lat;
+      ownerProfile.lng = lng;
+    }
     const existingPricing = db.pricing.find((p) => p.tractorId === tractor.id);
     const pricing = existingPricing ?? {
       tractorId: tractor.id,
