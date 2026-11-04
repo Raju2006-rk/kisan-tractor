@@ -247,9 +247,14 @@ export function Toggle({
   disabled?: boolean;
 }) {
   return (
-    <label
+    <div
+      onClick={(e) => {
+        if (disabled) return;
+        if ((e.target as HTMLElement).closest("button")) return;
+        onChange(!checked);
+      }}
       className={cn(
-        "flex cursor-pointer items-start justify-between gap-4",
+        "flex cursor-pointer select-none items-start justify-between gap-4",
         disabled && "cursor-not-allowed opacity-60",
       )}
     >
@@ -265,7 +270,10 @@ export function Toggle({
         aria-checked={checked}
         aria-label={typeof label === "string" ? label : "Toggle"}
         disabled={disabled}
-        onClick={() => onChange(!checked)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onChange(!checked);
+        }}
         className={cn(
           "relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors",
           checked ? "bg-forest" : "bg-line",
@@ -278,7 +286,7 @@ export function Toggle({
           )}
         />
       </button>
-    </label>
+    </div>
   );
 }
 

@@ -275,7 +275,9 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
     }
     setSaving(true);
     try {
-      const matchedVillage = VILLAGES.find((item) => item.name === form.village.trim());
+      const matchedVillage = VILLAGES.find(
+        (item) => item.name.toLowerCase() === form.village.trim().toLowerCase(),
+      );
       const payload = {
         brand: form.brand.trim(),
         model: form.model.trim(),
@@ -286,8 +288,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
         images: form.images.length ? form.images : form.image ? [form.image] : undefined,
         status: form.status,
         village: form.village.trim(),
-        district: matchedVillage?.district ?? user.ownerProfile?.district ?? "",
-        state: matchedVillage?.state ?? user.ownerProfile?.state ?? "",
+        district: matchedVillage?.district || user.ownerProfile?.district || "Nashik",
+        state: matchedVillage?.state || user.ownerProfile?.state || "Maharashtra",
         lat: formCoords.lat,
         lng: formCoords.lng,
         serviceRadiusKm: Number(form.serviceRadiusKm) || 10,
@@ -582,17 +584,44 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
               <Field label={t("app.brand")} required>
                 <Input
+                  list="tractor-brands-list"
                   value={form.brand}
                   onChange={(event) => update("brand", event.target.value)}
                   placeholder="Mahindra"
                 />
+                <datalist id="tractor-brands-list">
+                  <option value="Mahindra" />
+                  <option value="Swaraj" />
+                  <option value="John Deere" />
+                  <option value="Sonalika" />
+                  <option value="Massey Ferguson" />
+                  <option value="New Holland" />
+                  <option value="Kubota" />
+                  <option value="Eicher" />
+                  <option value="Powertrac" />
+                  <option value="Farmtrac" />
+                </datalist>
               </Field>
               <Field label={t("app.model")} required>
                 <Input
+                  list="tractor-models-list"
                   value={form.model}
                   onChange={(event) => update("model", event.target.value)}
                   placeholder="575 DI"
                 />
+                <datalist id="tractor-models-list">
+                  <option value="575 DI" />
+                  <option value="475 DI" />
+                  <option value="275 DI" />
+                  <option value="744 FE" />
+                  <option value="855 FE" />
+                  <option value="5050 D" />
+                  <option value="DI 745 III" />
+                  <option value="241 DI" />
+                  <option value="3630 TX" />
+                  <option value="MU4501" />
+                  <option value="380" />
+                </datalist>
               </Field>
               <Field label={t("app.registration")} required>
                 <Input
@@ -627,11 +656,19 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
                 hint={t("app.tractorVillageHint")}
               >
                 <Input
+                  list="village-options-list"
                   value={form.village}
                   onChange={(event) => changeVillageSelection(event.target.value)}
                   placeholder={t("app.villagePlaceholder")}
                   autoComplete="address-level2"
                 />
+                <datalist id="village-options-list">
+                  {VILLAGES.map((v) => (
+                    <option key={v.name} value={v.name}>
+                      {v.district}, {v.state}
+                    </option>
+                  ))}
+                </datalist>
               </Field>
               <Field label={t("app.serviceRadius")} hint="1–50 km">
                 <Input

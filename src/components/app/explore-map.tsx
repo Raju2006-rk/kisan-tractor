@@ -333,6 +333,23 @@ function LeafletExploreMap({
 
       markersRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
+
+      // Invalidate size immediately and with small delays so all map tiles load to fill 100% container width
+      map.invalidateSize();
+      setTimeout(() => map.invalidateSize(), 60);
+      setTimeout(() => map.invalidateSize(), 200);
+      setTimeout(() => map.invalidateSize(), 500);
+
+      // Handle window and container resize seamlessly
+      const resizeObserver = new ResizeObserver(() => {
+        map.invalidateSize();
+      });
+      if (containerRef.current) {
+        resizeObserver.observe(containerRef.current);
+      }
+
+      const onResize = () => map.invalidateSize();
+      window.addEventListener("resize", onResize);
     })();
 
     return () => {

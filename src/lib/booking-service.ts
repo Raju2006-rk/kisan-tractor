@@ -1720,7 +1720,8 @@ export async function saveTractor(
   if (!brand || !model) {
     throw new ServiceError("Please add the tractor brand and model.", 400);
   }
-  if (!/^[A-Z]{2}\s?\d{1,2}\s?[A-Z]{1,3}\s?\d{3,4}$/.test(registrationNumber)) {
+  const cleanPlate = registrationNumber.replace(/[\s\-_.]/g, "");
+  if (cleanPlate.length < 4 || !/^[A-Z0-9]+$/.test(cleanPlate)) {
     throw new ServiceError("Please enter a valid registration number, for example MH 15 GT 4821.", 400);
   }
   if (!input.hourlyEnabled && !input.acreEnabled && !input.tripEnabled) {

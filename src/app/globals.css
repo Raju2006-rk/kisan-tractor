@@ -252,3 +252,24 @@ input[type="number"] {
   outline: 2px solid var(--color-clay);
   outline-offset: 2px;
 }
+
+/* Leaflet map styles to ensure full container width/height and correct tile placement */
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  position: relative !important;
+  font-family: inherit;
+}
+
+.leaflet-container img {
+  max-width: none !important;
+  max-height: none !important;
+}
+
+.leaflet-tile {
+  visibility: inherit !important;
+}
+
+.leaflet-pane {
+  z-index: 400;
+}

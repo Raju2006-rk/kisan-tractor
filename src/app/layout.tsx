@@ -6,6 +6,7 @@ import type { Language } from "@/lib/types";
 import { LANGUAGES, RTL_LANGUAGES } from "@/lib/constants";
 import { AppProviders } from "@/components/providers/app-providers";
 import "./globals.css";
+import "leaflet/dist/leaflet.css";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
