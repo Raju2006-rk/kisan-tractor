@@ -366,10 +366,10 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
           sizes="50vw"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#102b1e] via-[#102b1e]/55 to-[#102b1e]/20" />
+        <div className="absolute inset-0 bg-linear-to-t from-[#102b1e] via-[#102b1e]/55 to-[#102b1e]/20" />
         <div className="relative flex h-full flex-col justify-between p-10">
           <div className="flex justify-end">
-            <Badge tone="green" className="!border-cream/20 !bg-cream/10 !text-cream">
+            <Badge tone="green" className="border-cream/20! bg-cream/10! text-cream!">
               {t("auth.rootedTrust")}
             </Badge>
           </div>
