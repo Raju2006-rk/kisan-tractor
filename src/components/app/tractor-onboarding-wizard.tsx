@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -98,6 +99,7 @@ export function TractorOnboardingWizard({
   onCompleted?: () => void;
   onCancel?: () => void;
 }) {
+  const router = useRouter();
   const { t } = useI18n();
   const { push } = useToast();
 
@@ -386,7 +388,8 @@ export function TractorOnboardingWizard({
         onCompleted();
       } else {
         // Step 7: Tractor Owner Dashboard opens
-        window.location.href = "/dashboard";
+        router.push("/dashboard");
+        router.refresh();
       }
     } catch (saveErr) {
       const msg = saveErr instanceof Error ? saveErr.message : "Could not save tractor details.";

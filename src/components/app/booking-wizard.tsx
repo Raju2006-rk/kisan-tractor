@@ -289,7 +289,6 @@ export function BookingWizard({
   const [mapsReturned, setMapsReturned] = useState(false);
   const [mapsLink, setMapsLink] = useState("");
   const [mapsLinkError, setMapsLinkError] = useState<string | null>(null);
-  const [mapsRefresh, setMapsRefresh] = useState(0);
   const mapsOpenedAt = useRef(0);
 
   const { data: listData, isLoading: listLoading } = useSWR<{
@@ -319,19 +318,16 @@ export function BookingWizard({
     return rows.length > 0 ? rows : (["hourly"] as PricingType[]);
   }, [selectedTractor]);
 
-  useEffect(() => {
-    if (!selectedTractor) return;
+  const [syncedTractorId, setSyncedTractorId] = useState(selectedTractor?.id);
+  if (selectedTractor && selectedTractor.id !== syncedTractorId) {
+    setSyncedTractorId(selectedTractor.id);
     if (!supportedServices.some((service) => service.id === serviceType)) {
-      // Reset to the first supported option when the chosen tractor changes.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setServiceType(supportedServices[0].id);
     }
     if (!enabledPricing.includes(pricingType)) {
       setPricingType(enabledPricing[0]);
     }
-    // Only re-check when the tractor changes; manual selections are preserved.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTractor?.id]);
+  }
 
   const minutes = Math.round(Number(hours) * 60);
   const acresValue = Number(acres);
@@ -460,7 +456,7 @@ export function BookingWizard({
       setMapsPending(true);
       setMapsReturned(false);
       const opened = window.open(url, "_blank");
-      if (!opened) window.location.href = url;
+      if (!opened) window.location.assign(url);
     };
 
     if (navigator.geolocation && (coords.lat === 0 || coords.lng === 0)) {
@@ -484,6 +480,11 @@ export function BookingWizard({
     }
   }
 
+  const detectLocationRef = useRef(detectLocation);
+  useEffect(() => {
+    detectLocationRef.current = detectLocation;
+  });
+
   useEffect(() => {
     if (!mapsPending) return;
     function handleReturn() {
@@ -498,7 +499,7 @@ export function BookingWizard({
       }
       setMapsPending(false);
       setMapsReturned(true);
-      setMapsRefresh((current) => current + 1);
+      detectLocationRef.current({ fromMaps: true });
     }
     window.addEventListener("focus", handleReturn);
     document.addEventListener("visibilitychange", handleReturn);
@@ -507,14 +508,6 @@ export function BookingWizard({
       document.removeEventListener("visibilitychange", handleReturn);
     };
   }, [mapsPending]);
-
-  useEffect(() => {
-    if (!mapsRefresh) return;
-    // The refresh is a one-off response to returning from Google Maps.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    detectLocation({ fromMaps: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapsRefresh]);
 
   async function applyMapsLink(value: string) {
     setMapsLink(value);

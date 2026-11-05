@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -26,6 +27,7 @@ import { TractorOnboardingWizard } from "@/components/app/tractor-onboarding-wiz
 type Step = "mobile" | "otp" | "tractor_onboarding";
 
 export function AuthScreen({ initialRole }: { initialRole: Role }) {
+  const router = useRouter();
   const { t, language } = useI18n();
   const { push } = useToast();
   const [role, setRole] = useState<Role>(initialRole);
@@ -54,7 +56,7 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
     }
   }, [step]);
 
-  async function requestOtp(event?: React.FormEvent) {
+  async function requestOtp(event?: SyntheticEvent) {
     event?.preventDefault();
     setError(null);
     setLoading(true);
@@ -85,9 +87,11 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
         push(t("auth.welcomeBack"), "success");
         const signedInRole = data.role ?? role;
         if (signedInRole === "owner" && !data.hasTractor) {
-          window.location.href = "/owner/tractor?onboarding=1";
+          router.push("/owner/tractor?onboarding=1");
+          router.refresh();
         } else {
-          window.location.href = "/dashboard";
+          router.push("/dashboard");
+          router.refresh();
         }
         return;
       }
@@ -106,7 +110,7 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
     }
   }
 
-  async function verifyOtp(event: React.FormEvent) {
+  async function verifyOtp(event: SyntheticEvent) {
     event.preventDefault();
     setError(null);
     setLoading(true);
@@ -138,7 +142,8 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
       // Upon successful verification, directly redirect to farmer dashboard.
       // Farmers should not have access to any tractor registration details.
       if (activeRole === "farmer") {
-        window.location.href = "/dashboard";
+        router.push("/dashboard");
+        router.refresh();
         return;
       }
 
@@ -148,7 +153,8 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
       if (activeRole === "owner") {
         if (data.hasTractor) {
           push(t("auth.welcomeBack"), "success");
-          window.location.href = "/dashboard";
+          router.push("/dashboard");
+          router.refresh();
           return;
         }
 
@@ -159,8 +165,9 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
         return;
       }
 
-      // Force full document navigation so new session cookies are attached immediately
-      window.location.href = "/dashboard";
+      // Attach new session cookies and navigate to dashboard
+      router.push("/dashboard");
+      router.refresh();
     } catch (verifyError) {
       setError(verifyError instanceof Error ? verifyError.message : t("auth.couldNotVerifyOtp"));
       setLoading(false);
@@ -185,7 +192,8 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
           <TractorOnboardingWizard
             user={authenticatedUser}
             onCompleted={() => {
-              window.location.href = "/dashboard";
+              router.push("/dashboard");
+              router.refresh();
             }}
           />
         </div>

@@ -2,7 +2,6 @@
 # Validates all skill directories for required structure
 
 $ErrorCount = 0
-$WarningCount = 0
 $SkillsChecked = 0
 
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan

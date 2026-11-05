@@ -248,12 +248,7 @@ export function Toggle({
   disabled?: boolean;
 }) {
   return (
-    <div
-      onClick={(e) => {
-        if (disabled) return;
-        if ((e.target as HTMLElement).closest("button")) return;
-        onChange(!checked);
-      }}
+    <label
       className={cn(
         "flex cursor-pointer select-none items-start justify-between gap-4",
         disabled && "cursor-not-allowed opacity-60",
@@ -265,25 +260,17 @@ export function Toggle({
           <span className="block text-xs leading-relaxed text-stone">{description}</span>
         ) : null}
       </span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={typeof label === "string" ? label : "Toggle"}
+      <input
+        type="checkbox"
+        checked={checked}
         disabled={disabled}
-        onClick={(e) => {
-          e.stopPropagation();
-          onChange(!checked);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!disabled) onChange(!checked);
-          }
-        }}
+        onChange={(e) => onChange(e.target.checked)}
+        className="sr-only"
+      />
+      <span
+        aria-hidden="true"
         className={cn(
-          "relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors",
+          "relative mt-0.5 inline-flex h-6 w-11 shrink-0 rounded-full transition-colors",
           checked ? "bg-forest" : "bg-line",
         )}
       >
@@ -293,8 +280,8 @@ export function Toggle({
             checked ? "left-[1.4rem]" : "left-0.5",
           )}
         />
-      </button>
-    </div>
+      </span>
+    </label>
   );
 }
 
