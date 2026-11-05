@@ -42,9 +42,22 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
   const deferredQuery = useDeferredValue(query);
 
   const profile = user.farmerProfile ?? user.ownerProfile;
-  const center = profile
-    ? { lat: profile.lat, lng: profile.lng }
-    : { lat: VILLAGES[0].lat, lng: VILLAGES[0].lng };
+  const center = useMemo(() => {
+    if (
+      profile &&
+      profile.lat !== 0 &&
+      profile.lng !== 0 &&
+      Number.isFinite(profile.lat) &&
+      Number.isFinite(profile.lng)
+    ) {
+      return { lat: profile.lat, lng: profile.lng };
+    }
+    const matched = profile?.village
+      ? VILLAGES.find((v) => v.name.toLowerCase() === profile.village.toLowerCase())
+      : undefined;
+    if (matched) return { lat: matched.lat, lng: matched.lng };
+    return { lat: VILLAGES[0].lat, lng: VILLAGES[0].lng };
+  }, [profile]);
   const [coords, setCoords] = useState(center);
   const [locationLabel, setLocationLabel] = useState(profile?.village ?? "");
   const areaLabel =
@@ -102,6 +115,8 @@ export function ExploreScreen({ user }: { user: SessionUser }) {
     setPricing("all");
     setDistance("all");
     setSort("nearest");
+    setCoords(center);
+    setLocationLabel(profile?.village ?? "");
   }
 
   function useMyLocation() {

@@ -23,22 +23,23 @@ export function Photo({
   priority?: boolean;
   overlay?: boolean;
 }) {
+  const cleanSrc = typeof src === "string" ? src.trim() : "";
   const [failed, setFailed] = useState(false);
-  const [currentSrc, setCurrentSrc] = useState(src);
+  const [prevSrc, setPrevSrc] = useState(cleanSrc);
 
-  if (currentSrc !== src) {
-    setCurrentSrc(src);
+  if (prevSrc !== cleanSrc) {
+    setPrevSrc(cleanSrc);
     setFailed(false);
   }
 
-  const valid = Boolean(src) && !failed;
+  const valid = Boolean(cleanSrc) && !failed;
 
   return (
     <div className={cn("relative overflow-hidden bg-sand", className)}>
       {valid ? (
         <Image
-          src={src as string}
-          alt={alt}
+          src={cleanSrc}
+          alt={alt || "Photo"}
           fill
           sizes={sizes}
           unoptimized={true}
@@ -49,7 +50,7 @@ export function Photo({
         />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center bg-[linear-gradient(135deg,#e8dcc2,#cdbb97)] text-forest/40">
-          <ImageOff className="size-8" />
+          <ImageOff className="size-8" aria-hidden="true" />
         </div>
       )}
       {overlay ? (

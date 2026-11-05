@@ -36,10 +36,46 @@ import {
   Select,
 } from "@/components/ui/primitives";
 import { useToast } from "@/components/providers/app-providers";
-import { LANGUAGES } from "@/lib/constants";
+import { LANGUAGES, VILLAGES } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 import type { Language, SessionUser } from "@/lib/types";
 import { cn, formatDate, maskMobile, reverseGeocode } from "@/lib/utils";
+
+function compressDocFile(file: File, maxDim = 1600, quality = 0.85): Promise<Blob> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve(file);
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => resolve(blob ?? file),
+          "image/jpeg",
+          quality,
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = (e.target?.result as string) || "";
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
 
 export function ProfileScreen({ user }: { user: SessionUser }) {
   const { t, language, setLanguage, roleLabel } = useI18n();
@@ -184,8 +220,8 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
           pincode: pincode.trim(),
           district: district.trim(),
           state: stateName.trim(),
-          lat: coords.lat,
-          lng: coords.lng,
+          lat: (coords.lat === 0 && coords.lng === 0 ? (VILLAGES.find((v) => v.name.toLowerCase() === village.trim().toLowerCase())?.lat ?? coords.lat) : coords.lat),
+          lng: (coords.lat === 0 && coords.lng === 0 ? (VILLAGES.find((v) => v.name.toLowerCase() === village.trim().toLowerCase())?.lng ?? coords.lng) : coords.lng),
           ...(isOwner
             ? {
                 serviceRadiusKm: Number(serviceRadiusKm) || 15,
@@ -219,8 +255,9 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
     setUploadingDoc(kind);
     setError(null);
     try {
+      const compressed = await compressDocFile(file);
       const body = new FormData();
-      body.append("file", file);
+      body.append("file", compressed, `${kind}-document.jpg`);
       body.append("purpose", "document");
       const response = await fetch("/api/upload", { method: "POST", body });
       const result = (await response.json()) as { url?: string; error?: string };
@@ -493,6 +530,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                             onChange={(event) => {
                               const file = event.target.files?.[0];
                               if (file) void uploadDocument("dl", file);
+                              event.target.value = "";
                             }}
                           />
                           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -568,6 +606,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
                         onChange={(event) => {
                           const file = event.target.files?.[0];
                           if (file) void uploadDocument("rc", file);
+                          event.target.value = "";
                         }}
                       />
                       <div className="mt-2 flex flex-wrap gap-1.5">

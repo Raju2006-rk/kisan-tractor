@@ -3,6 +3,7 @@
 import {
   forwardRef,
   useEffect,
+  useSyncExternalStore,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
@@ -29,7 +30,7 @@ export function buttonStyles(
     "inline-flex select-none items-center justify-center gap-2 rounded-full font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50",
     size === "sm" && "h-9 px-4 text-xs",
     size === "md" && "h-11 px-5 text-sm",
-    size === "lg" && "h-13 px-7 text-[0.95rem]",
+    size === "lg" && "h-[3.25rem] px-7 text-[0.95rem]",
     variant === "primary" &&
       "btn-shine bg-forest text-cream shadow-[0_10px_24px_-14px_rgba(22,59,42,0.9)] hover:bg-forest-600",
     variant === "clay" &&
@@ -147,7 +148,7 @@ export function Badge({
         className,
       )}
     >
-      {dot ? <span className={cn("size-1.5 rounded-full", dotColors[tone])} /> : null}
+      {dot ? <span aria-hidden="true" className={cn("size-1.5 rounded-full", dotColors[tone])} /> : null}
       {children}
     </span>
   );
@@ -202,7 +203,7 @@ export function Field({
         {hint ? <span className="text-[0.68rem] font-normal text-stone">{hint}</span> : null}
       </label>
       {children}
-      {error ? <p className="text-xs text-clay-dark">{error}</p> : null}
+      {error ? <p role="alert" className="text-xs text-clay-dark">{error}</p> : null}
     </div>
   );
 }
@@ -273,6 +274,13 @@ export function Toggle({
         onClick={(e) => {
           e.stopPropagation();
           onChange(!checked);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!disabled) onChange(!checked);
+          }
         }}
         className={cn(
           "relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors",
@@ -383,6 +391,8 @@ export function Alert({
   );
 }
 
+const emptySubscribe = () => () => {};
+
 export function Modal({
   open,
   onClose,
@@ -400,6 +410,12 @@ export function Modal({
   footer?: ReactNode;
   size?: "sm" | "md" | "lg";
 }) {
+  const isClient = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
@@ -414,7 +430,7 @@ export function Modal({
     };
   }, [open, onClose]);
 
-  if (!open || typeof document === "undefined") return null;
+  if (!open || !isClient || typeof document === "undefined") return null;
 
   return createPortal(
     <div className="fixed inset-0 z-1200 flex items-end justify-center sm:items-center">
