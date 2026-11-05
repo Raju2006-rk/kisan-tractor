@@ -70,8 +70,8 @@ export function LanguageGateway({
         window.localStorage.setItem("kt_lang", selectedLang);
         document.cookie = `kt_lang_selected=1; path=/; max-age=31536000; samesite=lax`;
         document.cookie = `kt_lang=${selectedLang}; path=/; max-age=31536000; samesite=lax`;
-      } catch (err) {
-        console.warn("Could not save language selection:", err);
+      } catch {
+        // Storage access may fail in private mode
       }
     }
     setHasConfirmed(true);
@@ -83,7 +83,7 @@ export function LanguageGateway({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Select Language"
+      aria-labelledby="language-dialog-title"
       className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto bg-stone-900/85 p-3 sm:p-5 backdrop-blur-md"
     >
       <div className="relative my-auto flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-line bg-paper shadow-2xl">
@@ -96,7 +96,7 @@ export function LanguageGateway({
             <Sparkles className="size-3 text-clay" />
             <span>ನಮಸ್ಕಾರ · नमस्ते · Welcome · నమస్కారం · வணக்கம் · नमस्कार</span>
           </div>
-          <h2 className="mt-3 font-display text-2xl text-forest sm:text-3xl">
+          <h2 id="language-dialog-title" className="mt-3 font-display text-2xl text-forest sm:text-3xl">
             Choose Your Language
           </h2>
           <p className="mt-1 text-xs text-stone sm:text-sm">
@@ -117,7 +117,6 @@ export function LanguageGateway({
                   key={lang.code}
                   type="button"
                   onClick={() => setSelectedLang(lang.code)}
-                  onDoubleClick={confirmLanguage}
                   className={cn(
                     "group relative flex flex-col items-start justify-between rounded-2xl border p-3.5 text-left transition-all duration-150",
                     active
