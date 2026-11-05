@@ -233,6 +233,7 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
   };
   const { data, isLoading, mutate } = useSWR<{ tractors: TractorWithOwner[] }>(
     "/api/tractors?owner=me",
+    { revalidateOnMount: true },
   );
   const tractors = data?.tractors ?? [];
   const [form, setForm] = useState<TractorForm>(() => emptyForm(user));
@@ -303,8 +304,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
 
   useEffect(() => {
     if (autoOpened || isLoading) return;
-    if (typeof window === "undefined") return;
     const onboarding =
+      typeof window !== "undefined" &&
       new URLSearchParams(window.location.search).get("onboarding") === "1";
     if (!onboarding) return;
     if (tractors.length > 0) {
@@ -650,7 +651,12 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
       setDocuments(emptyDocuments);
       setStep(0);
       setError(null);
-      router.push("/dashboard");
+      const isOnboarding =
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("onboarding") === "1";
+      if (isOnboarding) {
+        router.push("/dashboard");
+      }
       router.refresh();
     } catch (saveError) {
       const msg = saveError instanceof Error ? saveError.message : t("app.couldNotSaveTractor");

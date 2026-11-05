@@ -369,10 +369,11 @@ export function OwnerDashboard({ user }: { user: SessionUser }) {
   const { t } = useI18n();
   const { data, isLoading, mutate } = useSWR<OwnerDashboardResponse>(
     "/api/owner/dashboard",
-    { refreshInterval: 25000 },
+    { refreshInterval: 25000, revalidateOnMount: true },
   );
   const { data: tractorData } = useSWR<{ tractors: TractorWithOwner[] }>(
     "/api/tractors?owner=me",
+    { revalidateOnMount: true },
   );
 
   const dashboard = data?.dashboard;

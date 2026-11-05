@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser, refreshSession } from "@/lib/auth";
-import { saveTractor, searchTractors } from "@/lib/booking-service";
+import { mutateDb } from "@/lib/db";
+import { ensureOwnerProfile, saveTractor, searchTractors } from "@/lib/booking-service";
 import { handleApiError, jsonError, numberParam, readJson, requireUser } from "@/lib/http";
 import type { PricingType, ServiceType } from "@/lib/types";
 
@@ -43,7 +44,11 @@ export async function POST(request: Request) {
   try {
     const user = await requireUser();
     if (user.role !== "owner") {
-      return jsonError("Only tractor owners can register tractors.", 403);
+      await mutateDb((db) => {
+        const u = db.users.find((item) => item.id === user.id);
+        if (u) u.role = "owner";
+        ensureOwnerProfile(db, user.id);
+      });
     }
     const body = await readJson<Parameters<typeof saveTractor>[1]>(request);
     const tractor = await saveTractor(user.id, body);
