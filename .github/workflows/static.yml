@@ -1,43 +1,95 @@
-# Simple workflow for deploying static content to GitHub Pages
+# Workflow for building and deploying KisanTractor to GitHub Pages
 name: Deploy static content to Pages
 
 on:
-  # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
-  # Single deploy job since we're just deploying
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Lint and Types
+        run: |
+          npm run lint
+          npx tsc --noEmit
+
+      - name: Build Next.js
+        env:
+          ALLOW_LOCAL_DB: "true"
+          NEXT_PUBLIC_MAPS_PROVIDER: "openstreetmap"
+        run: npm run build
+
+      - name: Prepare Pages Artifact
+        run: |
+          mkdir -p ./pages-dist
+          if [ -d "public" ]; then
+            cp -r public/* ./pages-dist/ 2>/dev/null || true
+          fi
+          cat << 'EOF' > ./pages-dist/index.html
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>KisanTractor</title>
+            <style>
+              body { font-family: system-ui, -apple-system, sans-serif; background: #f7f2e6; color: #17231b; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 1rem; box-sizing: border-box; }
+              .card { background: #fffdf7; border: 1px solid #ddd3bf; border-radius: 1.5rem; padding: 2.5rem; max-width: 32rem; width: 100%; box-shadow: 0 16px 40px -30px rgba(23,35,27,0.35); text-align: center; }
+              h1 { color: #163b2a; margin: 0.5rem 0 1rem; font-size: 1.75rem; }
+              p { color: #667066; font-size: 0.95rem; line-height: 1.6; margin: 0.5rem 0; }
+              .badge { display: inline-flex; align-items: center; gap: 0.5rem; background: #163b2a; color: #f7f2e6; border-radius: 9999px; padding: 0.35rem 0.85rem; font-size: 0.75rem; font-weight: 600; }
+              .status-dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: #4ade80; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <span class="badge"><span class="status-dot"></span> KisanTractor Next.js App</span>
+              <h1>Build & Verification Passed</h1>
+              <p>The KisanTractor Next.js application built, linted, and type-checked with 0 errors.</p>
+              <p>For full SSR sessions, live cookie authentication, and tractor booking APIs, connect your repo to Vercel or a Node server.</p>
+            </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './pages-dist'
+
   deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # Upload entire repository
-          path: '.'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
