@@ -62,10 +62,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       dir={direction}
       data-scroll-behavior="smooth"
       suppressHydrationWarning
+      className={`${fraunces.variable} ${manrope.variable} ${devanagari.variable}`}
     >
-      <body
-        className={`${fraunces.variable} ${manrope.variable} ${devanagari.variable} antialiased`}
-      >
+      <body className="antialiased">
         <AppProviders initialLanguage={initialLanguage}>{children}</AppProviders>
       </body>
     </html>
