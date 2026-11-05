@@ -332,12 +332,16 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
       setFormState(match.state);
       return;
     }
-    // A name we cannot place must not keep the previous village's pin. The
-    // owner has to auto-detect the exact spot (or pick a listed village), and
-    // save stays blocked until genuine coordinates exist.
-    setFormCoords(EMPTY_COORDS);
-    setFormDistrict("");
-    setFormState("");
+    // Only reset coordinates if the form does not already hold valid detected GPS coordinates
+    if (
+      !Number.isFinite(formCoords.lat) ||
+      !Number.isFinite(formCoords.lng) ||
+      (formCoords.lat === 0 && formCoords.lng === 0)
+    ) {
+      setFormCoords(EMPTY_COORDS);
+      setFormDistrict("");
+      setFormState("");
+    }
   }
 
   function useFormLocation() {
@@ -362,10 +366,12 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
         try {
           const geo = await reverseGeocode(lat, lng);
           const near = nearestVillage(lat, lng);
-          // Prefer the actual village returned by the geocoder. A district or
-          // taluka name is never used as the village because that silently
-          // moves the tractor to the town centre.
-          const detected = geo.village || near?.name || "";
+          const detected =
+            geo.village ||
+            (geo.address ? geo.address.split(",")[0].trim() : "") ||
+            geo.district ||
+            near?.name ||
+            "";
           if (detected) update("village", detected);
           const district = geo.district || near?.district || "";
           const state = geo.state || near?.state || "";
@@ -384,6 +390,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
             update("village", near.name);
             setFormDistrict(near.district);
             setFormState(near.state);
+          } else {
+            update("village", form.village || `Location (${lat}, ${lng})`);
           }
           setFormLocationNote(
             t("app.tractorCoordinates", { coords: `${lat}, ${lng}` }),

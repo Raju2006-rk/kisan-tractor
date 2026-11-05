@@ -393,9 +393,10 @@ export function BookingWizard({
 
         try {
           const geo = await reverseGeocode(lat, lng);
-          // Only a real village/locality is used as the village label. The
-          // first line of a formatted address is often a road name.
-          const detected = geo.village;
+          const detected =
+            geo.village ||
+            geo.district ||
+            (geo.address ? geo.address.split(",")[0].trim() : "");
           if (detected) setVillageName(detected);
           if (geo.address) setFarmLabel(geo.address);
           if (geo.district) setDetectedDistrict(geo.district);
@@ -439,28 +440,48 @@ export function BookingWizard({
   function openGoogleMaps() {
     setError(null);
     setMapsLinkError(null);
-    const lat =
-      Number.isFinite(coords.lat) && coords.lat !== 0
-        ? coords.lat
-        : selectedVillage?.lat ?? null;
-    const lng =
-      Number.isFinite(coords.lng) && coords.lng !== 0
-        ? coords.lng
-        : selectedVillage?.lng ?? null;
-    const url =
-      lat !== null && lng !== null
-        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`
-        : "https://www.google.com/maps";
-    mapsOpenedAt.current = Date.now();
-    try {
-      sessionStorage.setItem("kt_maps_opened_at", String(mapsOpenedAt.current));
-    } catch {
-      // Private mode can reject sessionStorage; the focus listener still works.
+
+    const launchMaps = (latVal?: number, lngVal?: number) => {
+      const targetLat =
+        typeof latVal === "number" && Number.isFinite(latVal) && latVal !== 0
+          ? latVal
+          : selectedVillage?.lat ?? 12.9716;
+      const targetLng =
+        typeof lngVal === "number" && Number.isFinite(lngVal) && lngVal !== 0
+          ? lngVal
+          : selectedVillage?.lng ?? 77.5946;
+      const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${targetLat},${targetLng}`)}`;
+      mapsOpenedAt.current = Date.now();
+      try {
+        sessionStorage.setItem("kt_maps_opened_at", String(mapsOpenedAt.current));
+      } catch {
+        // Private mode can reject sessionStorage; the focus listener still works.
+      }
+      setMapsPending(true);
+      setMapsReturned(false);
+      const opened = window.open(url, "_blank");
+      if (!opened) window.location.href = url;
+    };
+
+    if (navigator.geolocation && (coords.lat === 0 || coords.lng === 0)) {
+      setLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLocating(false);
+          const lat = Math.round(pos.coords.latitude * 100000) / 100000;
+          const lng = Math.round(pos.coords.longitude * 100000) / 100000;
+          setCoords({ lat, lng });
+          launchMaps(lat, lng);
+        },
+        () => {
+          setLocating(false);
+          launchMaps();
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 },
+      );
+    } else {
+      launchMaps(coords.lat, coords.lng);
     }
-    setMapsPending(true);
-    setMapsReturned(false);
-    const opened = window.open(url, "_blank");
-    if (!opened) window.location.href = url;
   }
 
   useEffect(() => {
@@ -1182,23 +1203,30 @@ export function BookingWizard({
               ) : null}
 
               <div>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <h2 className="text-sm font-semibold text-forest">{t("app.serviceLocation")}</h2>
-                  <button
-                    type="button"
-                    onClick={bookingFor === "other" ? openGoogleMaps : () => detectLocation()}
-                    disabled={locating || mapsPending}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[0.65rem] font-semibold text-forest transition hover:border-forest/30 disabled:opacity-60"
-                  >
-                    <LocateFixed
-                      className={cn("size-3.5", (locating || mapsPending) && "animate-spin")}
-                    />
-                    {locating
-                      ? t("app.locating")
-                      : bookingFor === "other"
-                        ? t("app.openGoogleMaps")
-                        : t("common.useMyLocation")}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => detectLocation()}
+                      disabled={locating || mapsPending}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[0.65rem] font-semibold text-forest transition hover:border-forest/30 disabled:opacity-60"
+                    >
+                      <LocateFixed
+                        className={cn("size-3.5", locating && "animate-spin")}
+                      />
+                      {locating ? t("app.locating") : t("common.useMyLocation")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openGoogleMaps}
+                      disabled={locating || mapsPending}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-cream/70 px-3 py-1.5 text-[0.65rem] font-semibold text-forest transition hover:border-forest/30 disabled:opacity-60"
+                    >
+                      <MapIcon className="size-3.5 text-clay" />
+                      {mapsPending ? t("app.locating") : t("app.openGoogleMaps")}
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2">
                   <Field

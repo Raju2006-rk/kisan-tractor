@@ -156,14 +156,7 @@ export async function POST(request: Request) {
       }
     }
 
-    if (purpose === "document") {
-      return jsonError(
-        "Document uploads are temporarily unavailable. Please try again later.",
-        503,
-      );
-    }
-
-    // Photos fall back to the local uploads directory or a base64 data URL.
+    // Photos and fallback documents save to the local uploads directory or base64 data URL
     try {
       const uploadDir = path.join(process.cwd(), "public", "uploads");
       await fs.mkdir(uploadDir, { recursive: true });

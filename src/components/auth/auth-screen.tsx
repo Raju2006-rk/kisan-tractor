@@ -19,10 +19,11 @@ import { Alert, Badge, Button, Input, Field } from "@/components/ui/primitives";
 import { useToast } from "@/components/providers/app-providers";
 import { PHOTOS } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
-import type { Role } from "@/lib/types";
+import type { Role, SessionUser } from "@/lib/types";
 import { cn, maskMobile, mobileEnding } from "@/lib/utils";
+import { TractorOnboardingWizard } from "@/components/app/tractor-onboarding-wizard";
 
-type Step = "mobile" | "otp";
+type Step = "mobile" | "otp" | "tractor_onboarding";
 
 export function AuthScreen({ initialRole }: { initialRole: Role }) {
   const { t, language } = useI18n();
@@ -32,6 +33,7 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
   const [mobile, setMobile] = useState("");
   const [name, setName] = useState("");
   const [otp, setOtp] = useState("");
+  const [authenticatedUser, setAuthenticatedUser] = useState<SessionUser | null>(null);
   const [isExisting, setIsExisting] = useState(false);
   const [existingName, setExistingName] = useState<string | null>(null);
   const [devOtp, setDevOtp] = useState<string | null>(null);
@@ -111,7 +113,11 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mobile, otp, name, role, language }),
       });
-      const data = (await response.json()) as { error?: string; code?: string };
+      const data = (await response.json()) as {
+        error?: string;
+        code?: string;
+        user?: SessionUser;
+      };
       if (!response.ok) {
         throw new Error(
           data.code === "identity_mismatch"
@@ -119,9 +125,13 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
             : data.error ?? t("auth.couldNotVerifyOtp"),
         );
       }
+      if (role === "owner") {
+        setAuthenticatedUser(data.user ?? null);
+        setStep("tractor_onboarding");
+        return;
+      }
       // Force full document navigation so new session cookies are attached immediately
-      window.location.href =
-        role === "owner" ? "/owner/tractor?onboarding=1" : "/dashboard";
+      window.location.href = "/dashboard";
     } catch (verifyError) {
       setError(verifyError instanceof Error ? verifyError.message : t("auth.couldNotVerifyOtp"));
       setLoading(false);
@@ -132,6 +142,27 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
     { id: "farmer", title: t("auth.farmer"), body: t("auth.farmerBody"), icon: UserRound },
     { id: "owner", title: t("auth.owner"), body: t("auth.ownerBody"), icon: Tractor },
   ];
+
+  if (step === "tractor_onboarding") {
+    return (
+      <div className="min-h-dvh bg-cream px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl">
+          <div className="mb-6 flex items-center justify-between">
+            <Logo />
+            <div className="flex items-center gap-2">
+              <LanguageSwitcher />
+            </div>
+          </div>
+          <TractorOnboardingWizard
+            user={authenticatedUser}
+            onCompleted={() => {
+              window.location.href = "/dashboard";
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1.02fr_0.98fr]">

@@ -1665,6 +1665,13 @@ function safeText(value: unknown, maxLength = 200): string {
 
 function isSafeImageValue(value: string): boolean {
   if (!value || value.length > 30 * 1024 * 1024) return false;
+  if (
+    value.startsWith("/photos/") ||
+    value.startsWith("/images/") ||
+    value.startsWith("/icons/")
+  ) {
+    return true;
+  }
   if (/^\/uploads\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)) return true;
   if (/^\/api\/files\/(app-documents|app-files)\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)) {
     return true;
