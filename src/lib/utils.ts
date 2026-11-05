@@ -183,17 +183,18 @@ async function reverseWithOpenStreetMap(
     const village =
       addr.village ||
       addr.hamlet ||
-      addr.subdistrict ||
-      addr.taluk ||
-      addr.tehsil ||
-      addr.mandal ||
       addr.isolated_dwelling ||
-      addr.suburb ||
       addr.neighbourhood ||
+      addr.suburb ||
       addr.quarter ||
       addr.residential ||
       addr.town ||
       addr.municipality ||
+      addr.city_district ||
+      addr.subdistrict ||
+      addr.taluk ||
+      addr.tehsil ||
+      addr.mandal ||
       addr.city ||
       (data.display_name ? data.display_name.split(",")[0].trim() : "");
     const pincode = addr.postcode || "";
@@ -258,4 +259,40 @@ export async function reverseGeocode(
     state: "",
     provider: "coordinates",
   };
+}
+
+/**
+ * Extract a coordinate pair from anything a farmer may paste out of Google
+ * Maps: a share link, a browser URL, or a plain "lat, lng" pair.
+ */
+export function googleMapsCoords(
+  input: string,
+): { lat: number; lng: number } | null {
+  const value = input.trim();
+  if (!value) return null;
+
+  const patterns = [
+    /@(-?\d{1,3}(?:\.\d+)?),\s*(-?\d{1,3}(?:\.\d+)?)/,
+    /[?&](?:q|query|ll|center|destination|daddr)=(-?\d{1,3}(?:\.\d+)?),\s*(-?\d{1,3}(?:\.\d+)?)/i,
+    /!3d(-?\d{1,3}(?:\.\d+)?)!4d(-?\d{1,3}(?:\.\d+)?)/,
+    /(-?\d{1,3}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = value.match(pattern);
+    if (!match) continue;
+    const lat = Number(match[1]);
+    const lng = Number(match[2]);
+    if (
+      Number.isFinite(lat) &&
+      Number.isFinite(lng) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lng >= -180 &&
+      lng <= 180
+    ) {
+      return { lat, lng };
+    }
+  }
+  return null;
 }

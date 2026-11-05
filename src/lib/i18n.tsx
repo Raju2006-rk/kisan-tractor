@@ -59,6 +59,7 @@ const en = {
   "common.add": "Add",
   "common.close": "Close",
   "common.optional": "Optional",
+  "common.required": "Required",
   "common.all": "All",
   "common.active": "Active",
   "common.completed": "Completed",
@@ -1064,6 +1065,43 @@ const en = {
   "help.faq.a5": "Not yet. IVR booking is coming soon and no phone number is active. Please use the app for now.",
   "help.helpCta": "Go to my bookings",
   "help.bookingsCta": "Find a tractor",
+  "app.wizardStepOf": "Step {current} of {total}",
+  "app.wizardPhotoDetails": "Photo & details",
+  "app.wizardSpecs": "Specifications",
+  "app.wizardLocationStep": "Location",
+  "app.wizardDocumentsStep": "Documents",
+  "app.wizardNext": "Next",
+  "app.wizardBack": "Back",
+  "app.wizardSaveOpen": "Save & open dashboard",
+  "app.wizardPhotoRequired": "Add a clear photo of the tractor to continue.",
+  "app.wizardDetailsRequired": "Enter the tractor brand, model and registration number.",
+  "app.wizardSpecsRequired": "Enter the purchase year and horsepower.",
+  "app.wizardEquipmentRequired": "Select at least one attachment.",
+  "app.wizardLocationRequired": "Add the tractor location. Auto-detect it or type the village name.",
+  "app.wizardCoordinatesRequired": "We could not fix the exact coordinates. Tap auto-detect or choose a listed village.",
+  "app.wizardDocumentsRequired": "Upload both the driving licence and the RC to continue.",
+  "app.wizardDocsHint": "Both documents are required for verification. They are stored privately and shown only to you.",
+  "app.wizardDocsUploaded": "Uploaded and verified",
+  "app.wizardSaved": "Tractor saved. Opening your dashboard.",
+  "app.purchaseYear": "Purchase year",
+  "app.attachments": "Attachments",
+  "app.attachmentsHint": "Select the equipment you can bring to the farm.",
+  "app.ratesOptional": "Rates",
+  "app.locationDetecting": "Finding your exact village…",
+  "app.locationAddressFound": "Detected: {summary}",
+  "app.locationManualHint": "You can type the village name instead, then tap auto-detect to pin the exact spot.",
+  "app.openGoogleMaps": "Auto-detect on Google Maps",
+  "app.useGpsInstead": "Use device GPS instead",
+  "app.googleMapsHint": "Google Maps opens at your location. To use another spot, long-press the pin there, tap Share → Copy link and paste it below. Returning to this app also refreshes your device GPS.",
+  "app.googleMapsReturned": "Returned from Google Maps. Location refreshed.",
+  "app.locationNotSet": "No exact location yet — tap auto-detect to pin the farm.",
+  "app.locationNotSetError": "Set the exact farm location first — tap auto-detect or choose a listed village.",
+  "app.googleMapsPaste": "Paste a Google Maps link",
+  "app.googleMapsPasteHint": "In Google Maps, tap Share → Copy link and paste it here to set the exact location.",
+  "app.googleMapsPastePlaceholder": "https://maps.app.goo.gl/… or 20.0833, 73.9333",
+  "app.googleMapsInvalid": "That link does not contain a location. Paste a Google Maps share link or type latitude, longitude.",
+  "app.googleMapsLocationSet": "Location set from Google Maps: {village}",
+  "app.refreshLocation": "Refresh location",
 } as const;
 
 type Key = keyof typeof en;
@@ -1106,6 +1144,7 @@ const hi: Partial<Record<Key, string>> = {
   "common.add": "जोड़ें",
   "common.close": "बंद करें",
   "common.optional": "वैकल्पिक",
+  "common.required": "आवश्यक",
   "common.all": "सभी",
   "common.active": "सक्रिय",
   "common.completed": "पूर्ण",
@@ -1294,6 +1333,7 @@ const mr: Partial<Record<Key, string>> = {
   "common.add": "जोडा",
   "common.close": "बंद करा",
   "common.optional": "ऐच्छिक",
+  "common.required": "आवश्यक",
   "common.all": "सर्व",
   "common.active": "सक्रिय",
   "common.completed": "पूर्ण",
@@ -1518,7 +1558,9 @@ export function LanguageProvider({
   const setLanguage = useCallback((next: Language) => {
     setLanguageState(next);
     window.localStorage.setItem("kt_lang", next);
+    window.localStorage.setItem("kt_lang_selected", "true");
     document.cookie = `kt_lang=${next}; path=/; max-age=31536000; samesite=lax`;
+    document.cookie = `kt_lang_selected=1; path=/; max-age=31536000; samesite=lax`;
     fetch("/api/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

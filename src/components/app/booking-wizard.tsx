@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR, { useSWRConfig } from "swr";
@@ -11,9 +11,11 @@ import {
   CheckCircle2,
   Clock3,
   Compass,
+  ExternalLink,
   HandCoins,
   Info,
   LocateFixed,
+  Map as MapIcon,
   MapPin,
   Ruler,
   ShieldCheck,
@@ -50,7 +52,7 @@ import {
   addDaysISO,
   cn,
   formatDate,
-  haversineKm,
+  googleMapsCoords,
   mobileEnding,
   reverseGeocode,
   timeToMinutes,
@@ -244,27 +246,51 @@ export function BookingWizard({
   const [recipientName, setRecipientName] = useState("");
   const [recipientMobile, setRecipientMobile] = useState("");
   const profileVillageName = user.farmerProfile?.village?.trim() ?? "";
-  const defaultVillage = VILLAGES.find(
-    (village) => village.name === profileVillageName,
-  ) ?? VILLAGES[0];
-  const [villageName, setVillageName] = useState(
-    profileVillageName || defaultVillage.name,
+  const profileVillage = VILLAGES.find(
+    (village) =>
+      village.name.toLowerCase() === profileVillageName.toLowerCase(),
   );
+  // Only reuse a location the farmer actually saved. Falling back to the first
+  // demo village (or to 0,0) put bookings in a completely different place.
+  // Older accounts were created with a 20.0,73.8 placeholder (Nashik), so treat
+  // that exact pair as "not set" too.
+  const legacyPlaceholder =
+    Math.abs((user.farmerProfile?.lat ?? 0) - 20.0) < 1e-9 &&
+    Math.abs((user.farmerProfile?.lng ?? 0) - 73.8) < 1e-9;
+  const profileHasCoords =
+    typeof user.farmerProfile?.lat === "number" &&
+    typeof user.farmerProfile?.lng === "number" &&
+    !(user.farmerProfile.lat === 0 && user.farmerProfile.lng === 0) &&
+    !legacyPlaceholder;
+  const [villageName, setVillageName] = useState(profileVillageName);
   const [farmLabel, setFarmLabel] = useState(
-    user.farmerProfile?.address && user.farmerProfile.address !== defaultVillage.name
+    user.farmerProfile?.address && user.farmerProfile.address !== profileVillageName
       ? user.farmerProfile.address
       : "",
   );
   const [note, setNote] = useState("");
-  const [coords, setCoords] = useState({
-    lat: user.farmerProfile?.lat ?? defaultVillage.lat,
-    lng: user.farmerProfile?.lng ?? defaultVillage.lng,
-  });
+  const [coords, setCoords] = useState(() =>
+    profileHasCoords
+      ? { lat: user.farmerProfile!.lat!, lng: user.farmerProfile!.lng! }
+      : profileVillage
+        ? { lat: profileVillage.lat, lng: profileVillage.lng }
+        : { lat: 0, lng: 0 },
+  );
+  const [detectedDistrict, setDetectedDistrict] = useState(
+    user.farmerProfile?.district ?? "",
+  );
+  const [detectedState, setDetectedState] = useState(user.farmerProfile?.state ?? "");
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [created, setCreated] = useState<BookingDetail | null>(null);
+  const [mapsPending, setMapsPending] = useState(false);
+  const [mapsReturned, setMapsReturned] = useState(false);
+  const [mapsLink, setMapsLink] = useState("");
+  const [mapsLinkError, setMapsLinkError] = useState<string | null>(null);
+  const [mapsRefresh, setMapsRefresh] = useState(0);
+  const mapsOpenedAt = useRef(0);
 
   const { data: listData, isLoading: listLoading } = useSWR<{
     tractors: TractorWithOwner[];
@@ -328,24 +354,27 @@ export function BookingWizard({
   const selectedVillage =
     VILLAGES.find(
       (village) => village.name.toLowerCase() === villageName.trim().toLowerCase(),
-    ) ??
-    VILLAGES.reduce(
-      (best, village) => {
-        const distance = haversineKm(coords, village);
-        return distance < best.distance ? { village, distance } : best;
-      },
-      { village: VILLAGES[0], distance: Number.POSITIVE_INFINITY },
-    ).village;
+    ) ?? null;
 
   function chooseVillage(name: string) {
     setVillageName(name);
     const village = VILLAGES.find(
       (item) => item.name.toLowerCase() === name.trim().toLowerCase(),
     );
-    if (village) setCoords({ lat: village.lat, lng: village.lng });
+    if (village) {
+      setCoords({ lat: village.lat, lng: village.lng });
+      setDetectedDistrict(village.district);
+      setDetectedState(village.state);
+      return;
+    }
+    // A name we cannot place means the old pin may belong to the previous
+    // village. Clear it so auto-detect (or Google Maps) fills a real location.
+    setCoords({ lat: 0, lng: 0 });
+    setDetectedDistrict("");
+    setDetectedState("");
   }
 
-  function useMyLocation() {
+  function detectLocation(options?: { fromMaps?: boolean }) {
     setError(null);
     if (typeof window !== "undefined" && !window.isSecureContext) {
       setError(t("app.locationSecureRequired"));
@@ -358,18 +387,19 @@ export function BookingWizard({
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        const lat = Math.round(position.coords.latitude * 10000) / 10000;
-        const lng = Math.round(position.coords.longitude * 10000) / 10000;
+        const lat = Math.round(position.coords.latitude * 100000) / 100000;
+        const lng = Math.round(position.coords.longitude * 100000) / 100000;
         setCoords({ lat, lng });
 
         try {
           const geo = await reverseGeocode(lat, lng);
-          const detected =
-            geo.village ||
-            geo.district ||
-            (geo.address ? geo.address.split(",")[0].trim() : "");
+          // Only a real village/locality is used as the village label. The
+          // first line of a formatted address is often a road name.
+          const detected = geo.village;
           if (detected) setVillageName(detected);
           if (geo.address) setFarmLabel(geo.address);
+          if (geo.district) setDetectedDistrict(geo.district);
+          if (geo.state) setDetectedState(geo.state);
           push(
             detected
               ? t("app.wizardLocationDetected", { village: detected })
@@ -377,7 +407,12 @@ export function BookingWizard({
             "success",
           );
         } catch {
-          push(t("app.wizardLocationCaptured"), "info");
+          push(
+            options?.fromMaps
+              ? t("app.googleMapsReturned")
+              : t("app.wizardLocationCaptured"),
+            "info",
+          );
         } finally {
           setLocating(false);
         }
@@ -392,8 +427,129 @@ export function BookingWizard({
               : t("app.wizardLocationCouldNotRead"),
         );
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     );
+  }
+
+  /**
+   * Google Maps cannot call back into the app with the chosen point, so this
+   * opens Maps at the current coordinates, then refreshes the location when
+   * the browser regains focus. A share link can be pasted for an exact point.
+   */
+  function openGoogleMaps() {
+    setError(null);
+    setMapsLinkError(null);
+    const lat =
+      Number.isFinite(coords.lat) && coords.lat !== 0
+        ? coords.lat
+        : selectedVillage?.lat ?? null;
+    const lng =
+      Number.isFinite(coords.lng) && coords.lng !== 0
+        ? coords.lng
+        : selectedVillage?.lng ?? null;
+    const url =
+      lat !== null && lng !== null
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`
+        : "https://www.google.com/maps";
+    mapsOpenedAt.current = Date.now();
+    try {
+      sessionStorage.setItem("kt_maps_opened_at", String(mapsOpenedAt.current));
+    } catch {
+      // Private mode can reject sessionStorage; the focus listener still works.
+    }
+    setMapsPending(true);
+    setMapsReturned(false);
+    const opened = window.open(url, "_blank");
+    if (!opened) window.location.href = url;
+  }
+
+  useEffect(() => {
+    if (!mapsPending) return;
+    function handleReturn() {
+      if (document.visibilityState !== "visible") return;
+      const openedAt = mapsOpenedAt.current;
+      if (!openedAt || Date.now() - openedAt < 1200) return;
+      mapsOpenedAt.current = 0;
+      try {
+        sessionStorage.removeItem("kt_maps_opened_at");
+      } catch {
+        // Ignore storage failures.
+      }
+      setMapsPending(false);
+      setMapsReturned(true);
+      setMapsRefresh((current) => current + 1);
+    }
+    window.addEventListener("focus", handleReturn);
+    document.addEventListener("visibilitychange", handleReturn);
+    return () => {
+      window.removeEventListener("focus", handleReturn);
+      document.removeEventListener("visibilitychange", handleReturn);
+    };
+  }, [mapsPending]);
+
+  useEffect(() => {
+    if (!mapsRefresh) return;
+    // The refresh is a one-off response to returning from Google Maps.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    detectLocation({ fromMaps: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapsRefresh]);
+
+  async function applyMapsLink(value: string) {
+    setMapsLink(value);
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setMapsLinkError(null);
+      return;
+    }
+    let parsed = googleMapsCoords(trimmed);
+    if (!parsed && /^https?:\/\//i.test(trimmed)) {
+      // Short share links (maps.app.goo.gl/…) have no coordinates until the
+      // server follows the redirect chain.
+      try {
+        const response = await fetch("/api/geo/maps-link", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: trimmed }),
+        });
+        const data = (await response.json()) as {
+          coords?: { lat: number; lng: number };
+          error?: string;
+        };
+        if (response.ok && data.coords) {
+          parsed = data.coords;
+        } else if (data.error) {
+          setMapsLinkError(data.error);
+          return;
+        }
+      } catch {
+        // Fall through to the generic invalid-link message.
+      }
+    }
+    if (!parsed) {
+      setMapsLinkError(t("app.googleMapsInvalid"));
+      return;
+    }
+    setMapsLinkError(null);
+    const lat = Math.round(parsed.lat * 100000) / 100000;
+    const lng = Math.round(parsed.lng * 100000) / 100000;
+    setCoords({ lat, lng });
+    try {
+      const geo = await reverseGeocode(lat, lng);
+      const detected = geo.village;
+      if (detected) setVillageName(detected);
+      if (geo.address) setFarmLabel(geo.address);
+      if (geo.district) setDetectedDistrict(geo.district);
+      if (geo.state) setDetectedState(geo.state);
+      push(
+        t("app.googleMapsLocationSet", {
+          village: detected || `${lat}, ${lng}`,
+        }),
+        "success",
+      );
+    } catch {
+      push(t("app.googleMapsLocationSet", { village: `${lat}, ${lng}` }), "info");
+    }
   }
 
   function validateStep(current: number): string | null {
@@ -436,6 +592,13 @@ export function BookingWizard({
       }
       if (!farmLabel.trim()) return t("app.farmAddressError");
       if (!villageName.trim()) return t("app.villageError");
+      const hasCoords =
+        Number.isFinite(coords.lat) &&
+        Number.isFinite(coords.lng) &&
+        !(coords.lat === 0 && coords.lng === 0);
+      if (!hasCoords && !selectedVillage) {
+        return t("app.locationNotSetError");
+      }
     }
     return null;
   }
@@ -457,6 +620,12 @@ export function BookingWizard({
       return;
     }
     if (!selectedTractor) return;
+    const hasCoords =
+      Number.isFinite(coords.lat) &&
+      Number.isFinite(coords.lng) &&
+      !(coords.lat === 0 && coords.lng === 0);
+    const lat = hasCoords ? coords.lat : (selectedVillage?.lat ?? 0);
+    const lng = hasCoords ? coords.lng : (selectedVillage?.lng ?? 0);
     setSubmitting(true);
     setError(null);
     try {
@@ -472,10 +641,10 @@ export function BookingWizard({
           serviceLocation: {
             label: farmLabel.trim(),
             village: villageName.trim(),
-            district: selectedVillage.district,
-            state: selectedVillage.state,
-            lat: coords.lat,
-            lng: coords.lng,
+            district: detectedDistrict || selectedVillage?.district || "",
+            state: detectedState || selectedVillage?.state || "",
+            lat,
+            lng,
             note: note.trim(),
           },
           serviceType,
@@ -1017,12 +1186,18 @@ export function BookingWizard({
                   <h2 className="text-sm font-semibold text-forest">{t("app.serviceLocation")}</h2>
                   <button
                     type="button"
-                    onClick={useMyLocation}
-                    disabled={locating}
+                    onClick={bookingFor === "other" ? openGoogleMaps : () => detectLocation()}
+                    disabled={locating || mapsPending}
                     className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[0.65rem] font-semibold text-forest transition hover:border-forest/30 disabled:opacity-60"
                   >
-                    <LocateFixed className={cn("size-3.5", locating && "animate-spin")} />
-                    {locating ? t("app.locating") : t("common.useMyLocation")}
+                    <LocateFixed
+                      className={cn("size-3.5", (locating || mapsPending) && "animate-spin")}
+                    />
+                    {locating
+                      ? t("app.locating")
+                      : bookingFor === "other"
+                        ? t("app.openGoogleMaps")
+                        : t("common.useMyLocation")}
                   </button>
                 </div>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2">
@@ -1047,12 +1222,85 @@ export function BookingWizard({
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-cream/60 px-3 py-2 text-[0.65rem] text-stone">
                   <MapPin className="size-3.5 text-forest" />
-                  <span>
-                    {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
-                  </span>
-                  <span className="size-1 rounded-full bg-line" />
-                  <span>{selectedVillage.district}, {selectedVillage.state}</span>
+                  {coords.lat === 0 && coords.lng === 0 ? (
+                    <span>{t("app.locationNotSet")}</span>
+                  ) : (
+                    <>
+                      <span>
+                        {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
+                      </span>
+                      <span className="size-1 rounded-full bg-line" />
+                      <span>
+                        {detectedDistrict || selectedVillage?.district || ""}
+                        {detectedDistrict || selectedVillage?.district ? ", " : ""}
+                        {detectedState || selectedVillage?.state || ""}
+                      </span>
+                    </>
+                  )}
                 </div>
+
+                {bookingFor === "other" ? (
+                  <div className="mt-2 space-y-2 rounded-xl border border-clay/15 bg-clay/5 p-3">
+                    <p className="flex items-start gap-1.5 text-[0.65rem] leading-relaxed text-stone">
+                      <MapIcon className="mt-0.5 size-3.5 shrink-0 text-clay" />
+                      {t("app.googleMapsHint")}
+                    </p>
+                    {mapsReturned ? (
+                      <p
+                        role="status"
+                        className="rounded-lg bg-forest/8 px-2.5 py-1.5 text-[0.62rem] font-semibold text-forest"
+                      >
+                        {t("app.googleMapsReturned")}
+                      </p>
+                    ) : null}
+                    <Field label={t("app.googleMapsPaste")}>
+                      <Input
+                        value={mapsLink}
+                        onChange={(event) => {
+                          setMapsLink(event.target.value);
+                          setMapsLinkError(null);
+                        }}
+                        onPaste={(event) => {
+                          const text = event.clipboardData.getData("text");
+                          if (!text.trim()) return;
+                          event.preventDefault();
+                          void applyMapsLink(text);
+                        }}
+                        onBlur={(event) => void applyMapsLink(event.target.value)}
+                        placeholder={t("app.googleMapsPastePlaceholder")}
+                        autoComplete="off"
+                        inputMode="url"
+                      />
+                    </Field>
+                    <p className="text-[0.6rem] leading-relaxed text-stone">
+                      {t("app.googleMapsPasteHint")}
+                    </p>
+                    {mapsLinkError ? (
+                      <p role="alert" className="text-[0.62rem] text-clay-dark">
+                        {mapsLinkError}
+                      </p>
+                    ) : null}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => detectLocation({ fromMaps: true })}
+                        disabled={locating}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[0.65rem] font-semibold text-forest transition hover:border-forest/30 disabled:opacity-60"
+                      >
+                        <LocateFixed className={cn("size-3.5", locating && "animate-spin")} />
+                        {t("app.useGpsInstead")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={openGoogleMaps}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[0.65rem] font-semibold text-forest transition hover:border-forest/30"
+                      >
+                        <ExternalLink className="size-3.5" />
+                        {t("app.openGoogleMaps")}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               <Field label={t("app.noteOwner")} hint={t("app.noteOwnerHint")}>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, refreshSession } from "@/lib/auth";
 import { mutateDb } from "@/lib/db";
 import { ensureOwnerProfile, saveTractor, searchTractors } from "@/lib/booking-service";
 import { handleApiError, jsonError, numberParam, readJson, requireUser } from "@/lib/http";
@@ -52,6 +52,10 @@ export async function POST(request: Request) {
     }
     const body = await readJson<Parameters<typeof saveTractor>[1]>(request);
     const tractor = await saveTractor(user.id, body);
+    // Saving the first tractor also fills the owner profile location, so refresh
+    // the signed session snapshot; otherwise the dashboard keeps reading the
+    // pre-onboarding (empty) profile from the cookie.
+    await refreshSession(user.id);
     return NextResponse.json({ tractor }, { status: 201 });
   } catch (error) {
     return handleApiError(error);

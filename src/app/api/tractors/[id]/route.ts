@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, refreshSession } from "@/lib/auth";
 import { mutateDb } from "@/lib/db";
 import {
   deleteTractor,
@@ -39,6 +39,8 @@ export async function PATCH(
     const { id } = await context.params;
     const body = await readJson<Parameters<typeof saveTractor>[1]>(request);
     const tractor = await saveTractor(user.id, { ...body, id });
+    // Keep the signed session snapshot in step with profile location edits.
+    await refreshSession(user.id);
     return NextResponse.json({ tractor });
   } catch (error) {
     return handleApiError(error);

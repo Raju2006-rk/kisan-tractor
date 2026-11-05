@@ -13,6 +13,7 @@ import {
 import { SWRConfig } from "swr";
 import { CheckCircle2, Info, TriangleAlert, X } from "lucide-react";
 import { LanguageProvider } from "@/lib/i18n";
+import { LanguageGateway } from "@/components/ui/language-gateway";
 import type { Language } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -139,9 +140,11 @@ export function useInterval(callback: () => void, delay: number | null) {
 export function AppProviders({
   children,
   initialLanguage,
+  initialLanguageSelected = false,
 }: {
   children: ReactNode;
   initialLanguage: Language;
+  initialLanguageSelected?: boolean;
 }) {
   return (
     <SWRConfig
@@ -153,6 +156,7 @@ export function AppProviders({
       }}
     >
       <LanguageProvider initialLanguage={initialLanguage}>
+        <LanguageGateway initiallySelected={initialLanguageSelected} />
         <ToastProvider>{children}</ToastProvider>
       </LanguageProvider>
     </SWRConfig>

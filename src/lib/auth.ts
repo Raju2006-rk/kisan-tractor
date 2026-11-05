@@ -369,8 +369,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
         district: farmerProfile?.district || "",
         state: farmerProfile?.state || "",
         pincode: farmerProfile?.pincode || "",
-        lat: farmerProfile?.lat || 20.0,
-        lng: farmerProfile?.lng || 73.8,
+        lat: farmerProfile?.lat || 0,
+        lng: farmerProfile?.lng || 0,
         online: true,
         serviceRadiusKm: 15,
         payment: {
@@ -716,8 +716,8 @@ export async function findOrCreateUser(input: {
           district: "",
           state: "",
           pincode: "",
-          lat: 20.0,
-          lng: 73.8,
+          lat: 0,
+          lng: 0,
           online: true,
           serviceRadiusKm: 15,
           payment: {
@@ -741,8 +741,8 @@ export async function findOrCreateUser(input: {
           district: "",
           state: "",
           pincode: "",
-          lat: 20.0,
-          lng: 73.8,
+          lat: 0,
+          lng: 0,
         });
       }
     });

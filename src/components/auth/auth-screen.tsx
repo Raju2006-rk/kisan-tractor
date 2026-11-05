@@ -80,9 +80,10 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
       }
       if (data.signedIn) {
         push(t("auth.welcomeBack"), "success");
+        const signedInRole = data.role ?? role;
         // Force full document navigation so new session cookies are attached immediately
-        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-        window.location.href = "/dashboard";
+        window.location.href =
+          signedInRole === "owner" ? "/owner/tractor?onboarding=1" : "/dashboard";
         return;
       }
       setDevOtp(data.devOtp ?? null);
@@ -119,8 +120,8 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
         );
       }
       // Force full document navigation so new session cookies are attached immediately
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.href = "/dashboard";
+      window.location.href =
+        role === "owner" ? "/owner/tractor?onboarding=1" : "/dashboard";
     } catch (verifyError) {
       setError(verifyError instanceof Error ? verifyError.message : t("auth.couldNotVerifyOtp"));
       setLoading(false);

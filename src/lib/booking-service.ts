@@ -76,8 +76,8 @@ export function ensureOwnerProfile(db: Database, userId: string): OwnerProfile {
       district: farmer?.district || "",
       state: farmer?.state || "",
       pincode: farmer?.pincode || "",
-      lat: farmer?.lat || 20.0,
-      lng: farmer?.lng || 73.8,
+      lat: farmer?.lat || 0,
+      lng: farmer?.lng || 0,
       online: true,
       serviceRadiusKm: 15,
       payment: {
@@ -108,8 +108,8 @@ export function ensureFarmerProfile(db: Database, userId: string): FarmerProfile
       district: owner?.district || "",
       state: owner?.state || "",
       pincode: owner?.pincode || "",
-      lat: owner?.lat || 20.0,
-      lng: owner?.lng || 73.8,
+      lat: owner?.lat || 0,
+      lng: owner?.lng || 0,
     };
     db.farmerProfiles.push(profile);
   }
@@ -1722,6 +1722,11 @@ export async function saveTractor(
     acreRate: number;
     tripEnabled: boolean;
     tripRate: number;
+    documents?: {
+      dlPhoto?: string | null;
+      rcPhoto?: string | null;
+      rcNumber?: string | null;
+    };
   },
 ): Promise<Tractor> {
   const brand = safeText(input.brand, 60) || "Mahindra";
@@ -1775,8 +1780,17 @@ export async function saveTractor(
     const matched = VILLAGES.find(
       (v) => v.name.toLowerCase() === (input.village || "").trim().toLowerCase(),
     );
-    lat = matched?.lat ?? 12.9716;
-    lng = matched?.lng ?? 77.5946;
+    // Never guess a fallback city. Saving a tractor at a wrong place hides it
+    // from the farmers who could actually hire it, so make the client send a
+    // real location (auto-detected GPS or a listed village).
+    if (!matched) {
+      throw new ServiceError(
+        "Add the tractor's location before saving. Auto-detect it or choose a listed village.",
+        400,
+      );
+    }
+    lat = matched.lat;
+    lng = matched.lng;
   }
   const serviceRadiusKm =
     Number.isFinite(input.serviceRadiusKm) &&
@@ -1845,8 +1859,8 @@ export async function saveTractor(
     tractor.status = status;
     const tractorVillage = safeText(input.village, 80) || (ownerProfile.village ?? "").trim() || "Village";
     tractor.village = tractorVillage;
-    tractor.district = (safeText(input.district, 80) || ownerProfile.district || "Bengaluru Urban").slice(0, 80);
-    tractor.state = (safeText(input.state, 80) || ownerProfile.state || "Karnataka").slice(0, 80);
+    tractor.district = (safeText(input.district, 80) || ownerProfile.district || "").slice(0, 80);
+    tractor.state = (safeText(input.state, 80) || ownerProfile.state || "").slice(0, 80);
     tractor.lat = lat;
     tractor.lng = lng;
     tractor.serviceRadiusKm = serviceRadiusKm;
@@ -1857,6 +1871,49 @@ export async function saveTractor(
       ownerProfile.state = tractor.state;
       ownerProfile.lat = lat;
       ownerProfile.lng = lng;
+    }
+    if (input.documents) {
+      const docs = ownerProfile.documents ?? {
+        dlStatus: "not_provided",
+        rcStatus: "not_provided",
+      };
+      if (input.documents.dlPhoto !== undefined) {
+        const photo =
+          typeof input.documents.dlPhoto === "string"
+            ? input.documents.dlPhoto.trim()
+            : "";
+        if (photo && !isSafeImageValue(photo)) {
+          throw new ServiceError("Please upload a valid driving licence image.", 400);
+        }
+        docs.dlPhoto = photo || undefined;
+        docs.dlStatus = photo ? "verified" : "not_provided";
+      }
+      if (input.documents.rcPhoto !== undefined) {
+        const photo =
+          typeof input.documents.rcPhoto === "string"
+            ? input.documents.rcPhoto.trim()
+            : "";
+        if (photo && !isSafeImageValue(photo)) {
+          throw new ServiceError("Please upload a valid RC image.", 400);
+        }
+        docs.rcPhoto = photo || undefined;
+      }
+      if (input.documents.rcNumber !== undefined) {
+        const rcNumber = safeText(input.documents.rcNumber, 20).toUpperCase();
+        if (
+          rcNumber &&
+          !/^[A-Z]{2}\s?\d{1,2}\s?[A-Z]{1,3}\s?\d{3,4}$/i.test(rcNumber)
+        ) {
+          throw new ServiceError(
+            "Enter a valid RC number, for example MH 15 AB 1234.",
+            400,
+          );
+        }
+        docs.rcNumber = rcNumber || undefined;
+      }
+      docs.rcStatus = docs.rcNumber || docs.rcPhoto ? "verified" : "not_provided";
+      docs.updatedAt = new Date().toISOString();
+      ownerProfile.documents = docs;
     }
     const existingPricing = db.pricing.find((p) => p.tractorId === tractor.id);
     const pricing = existingPricing ?? {

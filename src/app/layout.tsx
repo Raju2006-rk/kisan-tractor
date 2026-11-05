@@ -55,6 +55,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       ? (cookieLanguage as Language)
       : "en";
   const direction = RTL_LANGUAGES.includes(initialLanguage) ? "rtl" : "ltr";
+  const initialLanguageSelected = jar.get("kt_lang_selected")?.value === "1";
 
   return (
     <html
@@ -65,7 +66,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       className={`${fraunces.variable} ${manrope.variable} ${devanagari.variable}`}
     >
       <body className="antialiased">
-        <AppProviders initialLanguage={initialLanguage}>{children}</AppProviders>
+        <AppProviders
+          initialLanguage={initialLanguage}
+          initialLanguageSelected={initialLanguageSelected}
+        >
+          {children}
+        </AppProviders>
       </body>
     </html>
   );
