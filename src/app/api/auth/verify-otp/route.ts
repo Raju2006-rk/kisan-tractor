@@ -89,11 +89,14 @@ export async function POST(request: Request) {
     const profile =
       fresh.farmerProfiles.find((p) => p.userId === user.id) ??
       fresh.ownerProfiles.find((p) => p.userId === user.id);
+    const hasTractor = fresh.tractors.some((t) => t.ownerId === user.id);
 
     return NextResponse.json({
       ok: true,
       signedIn: true,
       isNew,
+      role: user.role,
+      hasTractor,
       user: { ...user, profile },
     });
   } catch (error) {

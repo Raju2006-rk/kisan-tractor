@@ -72,6 +72,7 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
         isExisting?: boolean;
         name?: string | null;
         role?: Role | null;
+        hasTractor?: boolean;
       };
       if (!response.ok) {
         throw new Error(
@@ -83,9 +84,11 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
       if (data.signedIn) {
         push(t("auth.welcomeBack"), "success");
         const signedInRole = data.role ?? role;
-        // Force full document navigation so new session cookies are attached immediately
-        window.location.href =
-          signedInRole === "owner" ? "/owner/tractor?onboarding=1" : "/dashboard";
+        if (signedInRole === "owner" && !data.hasTractor) {
+          window.location.href = "/owner/tractor?onboarding=1";
+        } else {
+          window.location.href = "/dashboard";
+        }
         return;
       }
       setDevOtp(data.devOtp ?? null);
@@ -117,6 +120,8 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
         error?: string;
         code?: string;
         user?: SessionUser;
+        role?: Role;
+        hasTractor?: boolean;
       };
       if (!response.ok) {
         throw new Error(
@@ -125,11 +130,35 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
             : data.error ?? t("auth.couldNotVerifyOtp"),
         );
       }
-      if (role === "owner") {
+
+      const activeRole = data.role ?? role;
+
+      // 3. Farmer Login:
+      // Farmers log in using mobile number and OTP.
+      // Upon successful verification, directly redirect to farmer dashboard.
+      // Farmers should not have access to any tractor registration details.
+      if (activeRole === "farmer") {
+        window.location.href = "/dashboard";
+        return;
+      }
+
+      // 2. Tractor Owner Login:
+      // If a tractor owner has already registered their details (name, tractor details, etc.)
+      // and these are present in the backend, directly redirect to owner dashboard without re-registering.
+      if (activeRole === "owner") {
+        if (data.hasTractor) {
+          push(t("auth.welcomeBack"), "success");
+          window.location.href = "/dashboard";
+          return;
+        }
+
+        // 1. Tractor Owner Registration:
+        // New tractor owner or owner without tractor registered yet provides tractor details.
         setAuthenticatedUser(data.user ?? null);
         setStep("tractor_onboarding");
         return;
       }
+
       // Force full document navigation so new session cookies are attached immediately
       window.location.href = "/dashboard";
     } catch (verifyError) {

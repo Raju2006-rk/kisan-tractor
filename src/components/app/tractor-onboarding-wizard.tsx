@@ -120,18 +120,16 @@ export function TractorOnboardingWizard({
 
   // Step 4: Location Entry
   const profileVillage = user?.ownerProfile?.village?.trim() ?? "";
-  const [locationName, setLocationName] = useState<string>(
-    profileVillage || "Niphad",
-  );
+  const [locationName, setLocationName] = useState<string>(profileVillage);
   const [coords, setCoords] = useState(() => ({
-    lat: user?.ownerProfile?.lat && user.ownerProfile.lat !== 0 ? user.ownerProfile.lat : 20.0833,
-    lng: user?.ownerProfile?.lng && user.ownerProfile.lng !== 0 ? user.ownerProfile.lng : 73.9333,
+    lat: user?.ownerProfile?.lat ?? 0,
+    lng: user?.ownerProfile?.lng ?? 0,
   }));
   const [detectedDistrict, setDetectedDistrict] = useState<string>(
-    user?.ownerProfile?.district ?? "Nashik",
+    user?.ownerProfile?.district ?? "",
   );
   const [detectedState, setDetectedState] = useState<string>(
-    user?.ownerProfile?.state ?? "Maharashtra",
+    user?.ownerProfile?.state ?? "",
   );
   const [serviceRadiusKm, setServiceRadiusKm] = useState<number>(
     user?.ownerProfile?.serviceRadiusKm ?? 15,
@@ -218,8 +216,8 @@ export function TractorOnboardingWizard({
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const lat = Math.round(pos.coords.latitude * 10000) / 10000;
-        const lng = Math.round(pos.coords.longitude * 10000) / 10000;
+        const lat = Math.round(pos.coords.latitude * 100000) / 100000;
+        const lng = Math.round(pos.coords.longitude * 100000) / 100000;
         setCoords({ lat, lng });
 
         try {
@@ -310,13 +308,15 @@ export function TractorOnboardingWizard({
         (v) => v.name.toLowerCase() === locationName.trim().toLowerCase(),
       );
       const district =
-        detectedDistrict || matchedVillage?.district || "Nashik";
-      const state = detectedState || matchedVillage?.state || "Maharashtra";
+        detectedDistrict || matchedVillage?.district || "";
+      const state = detectedState || matchedVillage?.state || "";
       let lat = coords.lat;
       let lng = coords.lng;
       if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
-        lat = matchedVillage?.lat ?? 20.0833;
-        lng = matchedVillage?.lng ?? 73.9333;
+        if (matchedVillage) {
+          lat = matchedVillage.lat;
+          lng = matchedVillage.lng;
+        }
       }
 
       const payload = {

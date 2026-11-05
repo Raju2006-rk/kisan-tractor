@@ -133,8 +133,8 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        const lat = Math.round(position.coords.latitude * 10000) / 10000;
-        const lng = Math.round(position.coords.longitude * 10000) / 10000;
+        const lat = Math.round(position.coords.latitude * 100000) / 100000;
+        const lng = Math.round(position.coords.longitude * 100000) / 100000;
         setCoords({ lat, lng });
 
         try {

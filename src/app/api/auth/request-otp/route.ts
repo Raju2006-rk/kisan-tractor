@@ -68,6 +68,7 @@ export async function POST(request: Request) {
     if (existing && (await isTrustedDevice(existing.id, mobile))) {
       await createSession(existing.id);
       await rememberDevice(existing);
+      const hasTractor = db.tractors.some((t) => t.ownerId === existing.id);
       const { otp, expiresAt } = await createOtpChallenge(mobile, existing.role);
       return NextResponse.json({
         ok: true,
@@ -75,6 +76,7 @@ export async function POST(request: Request) {
         isNew: false,
         mobile,
         role: existing.role,
+        hasTractor,
         name: existing.name,
         devOtp: isDevOtpEnabledFor(mobile) ? otp : undefined,
         expiresAt,

@@ -165,6 +165,18 @@ export type ReverseGeocodeResult = {
   provider?: "google" | "openstreetmap" | "coordinates";
 };
 
+export function cleanPlaceName(val?: string | null): string {
+  if (!val || typeof val !== "string") return "";
+  let s = val.trim();
+  // Strip Plus Code prefix (e.g. 8FW4V888+88, 7J4V+3Q, etc.)
+  s = s.replace(/^[A-Z0-9]{2,8}\+[A-Z0-9]{2,4}\s*,?\s*/i, "").trim();
+  if (/[A-Z0-9]{2,8}\+[A-Z0-9]{2,4}/i.test(s)) return "";
+  if (/^unnamed\s*(road|street|path|lane|gali)?$/i.test(s)) return "";
+  if (/^(nh|sh|ah|state highway|national highway)\s*[-–]?\s*\d+$/i.test(s)) return "";
+  if (/^\d{3,8}$/.test(s)) return "";
+  return s;
+}
+
 async function reverseWithOpenStreetMap(
   lat: number,
   lng: number,
@@ -180,30 +192,55 @@ async function reverseWithOpenStreetMap(
       address?: Record<string, string>;
     };
     const addr = data.address || {};
-    const village =
-      addr.village ||
-      addr.hamlet ||
-      addr.isolated_dwelling ||
-      addr.neighbourhood ||
-      addr.suburb ||
-      addr.quarter ||
-      addr.residential ||
-      addr.town ||
-      addr.municipality ||
-      addr.city_district ||
-      addr.subdistrict ||
-      addr.taluk ||
-      addr.tehsil ||
-      addr.mandal ||
-      addr.city ||
-      (data.display_name ? data.display_name.split(",")[0].trim() : "");
-    const pincode = addr.postcode || "";
-    const district =
-      addr.state_district || addr.county || addr.district || addr.city_district || addr.city || "";
-    const state = addr.state || "";
-    const address =
-      data.display_name ||
-      [village, district, state, pincode].filter(Boolean).join(", ");
+
+    const candidates = [
+      addr.village,
+      addr.hamlet,
+      addr.town,
+      addr.subdistrict,
+      addr.taluk,
+      addr.tehsil,
+      addr.mandal,
+      addr.city,
+      addr.neighbourhood,
+      addr.suburb,
+      addr.city_district,
+      addr.residential,
+    ];
+
+    let village = "";
+    for (const cand of candidates) {
+      if (cand) {
+        const cleaned = cleanPlaceName(cand);
+        if (cleaned) {
+          village = cleaned;
+          break;
+        }
+      }
+    }
+
+    const district = cleanPlaceName(
+      addr.state_district || addr.county || addr.district || addr.city_district || addr.city || "",
+    );
+    const state = cleanPlaceName(addr.state || "");
+    const pincode = cleanPlaceName(addr.postcode || "");
+
+    if (!village && data.display_name) {
+      const parts = data.display_name.split(",").map((p) => cleanPlaceName(p)).filter(Boolean);
+      for (const part of parts) {
+        if (!/^(india|bharat)$/i.test(part) && part !== state && part !== district) {
+          village = part;
+          break;
+        }
+      }
+    }
+
+    let address = data.display_name || "";
+    address = cleanPlaceName(address) || address;
+    if (!address) {
+      address = [village, district, state, pincode].filter(Boolean).join(", ");
+    }
+
     if (!address && !village) return null;
     return {
       address,
