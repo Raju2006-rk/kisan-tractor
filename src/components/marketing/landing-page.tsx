@@ -192,7 +192,7 @@ function Hero() {
                 sizes="(max-width: 1024px) 100vw, 50vw"
                 priority
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#102b1e]/55 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-linear-to-t from-[#102b1e]/55 via-transparent to-transparent" />
             </div>
             <div className="pointer-events-none absolute bottom-4 left-4 right-4 flex flex-wrap items-end justify-between gap-2 sm:bottom-5 sm:left-5 sm:right-5">
               <div className="rounded-2xl border border-forest/10 bg-paper/85 px-3.5 py-2.5 backdrop-blur">
@@ -392,7 +392,7 @@ function DirectPayment() {
   const { t } = useI18n();
   return (
     <section className="relative overflow-hidden bg-forest py-16 text-cream sm:py-20 lg:py-24">
-      <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(#f7f2e6_1px,transparent_1px)] [background-size:26px_26px]" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.08] bg-[radial-gradient(#f7f2e6_1px,transparent_1px)] bg-size-[26px_26px]" />
       <div className="container-page relative grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
         <div>
           <span className="eyebrow !text-wheat">{t("landing.payment.eyebrow")}</span>

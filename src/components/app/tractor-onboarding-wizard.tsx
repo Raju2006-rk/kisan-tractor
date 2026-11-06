@@ -698,7 +698,7 @@ export function TractorOnboardingWizard({
                     className={cn(
                       "flex items-start gap-3 rounded-2xl border p-3 text-left transition",
                       isChecked
-                        ? "border-forest bg-forest/[0.07] ring-1 ring-forest/30"
+                        ? "border-forest bg-forest/7 ring-1 ring-forest/30"
                         : "border-line bg-sand/20 hover:bg-sand/50",
                     )}
                   >
@@ -710,7 +710,7 @@ export function TractorOnboardingWizard({
                           : "border-line bg-paper text-transparent",
                       )}
                     >
-                      <Check className="size-3 stroke-[3]" />
+                      <Check className="size-3 stroke-3" />
                     </span>
                     <div>
                       <p className="text-xs font-bold text-forest">{eq.name}</p>
@@ -858,7 +858,7 @@ export function TractorOnboardingWizard({
       {/* Step 5: Document Upload & Verification */}
       {currentStep === "documents" && (
         <div className="mt-5 space-y-5">
-          <div className="rounded-2xl border border-forest/15 bg-forest/[0.04] p-3 text-xs text-forest">
+          <div className="rounded-2xl border border-forest/15 bg-forest/4 p-3 text-xs text-forest">
             <div className="flex items-center gap-1.5 font-semibold">
               <BadgeCheck className="size-4 text-forest" />
               Document Upload & Verification

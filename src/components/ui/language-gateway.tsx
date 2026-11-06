@@ -105,11 +105,11 @@ export function LanguageGateway({
       role="dialog"
       aria-modal="true"
       aria-labelledby="language-dialog-title"
-      className="fixed inset-0 z-[99999] flex items-center justify-center overflow-y-auto bg-stone-950/90 p-3 sm:p-5 backdrop-blur-lg"
+      className="fixed inset-0 z-99999 flex items-center justify-center overflow-y-auto bg-stone-950/90 p-3 sm:p-5 backdrop-blur-lg"
     >
       <div className="relative my-auto flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-line bg-paper shadow-2xl">
         {/* Top banner */}
-        <div className="border-b border-line/80 bg-gradient-to-r from-forest/15 via-wheat/30 to-sand/60 px-6 py-6 text-center sm:px-8">
+        <div className="border-b border-line/80 bg-linear-to-r from-forest/15 via-wheat/30 to-sand/60 px-6 py-6 text-center sm:px-8">
           <div className="mx-auto flex justify-center">
             <Logo />
           </div>
@@ -142,7 +142,7 @@ export function LanguageGateway({
                   className={cn(
                     "group relative flex flex-col items-start justify-between rounded-2xl border p-3.5 text-left transition-all duration-150 cursor-pointer",
                     active
-                      ? "border-forest bg-forest/[0.08] text-forest shadow-sm ring-2 ring-forest/30"
+                      ? "border-forest bg-forest/8 text-forest shadow-sm ring-2 ring-forest/30"
                       : "border-line bg-sand/30 text-ink hover:border-forest/30 hover:bg-sand/60",
                   )}
                 >
@@ -158,7 +158,7 @@ export function LanguageGateway({
                           : "border-line bg-paper text-transparent group-hover:border-forest/40",
                       )}
                     >
-                      <Check className="size-3 stroke-[3]" />
+                      <Check className="size-3 stroke-3" />
                     </span>
                   </div>
                   <span className="mt-1 text-[0.68rem] font-medium text-stone">

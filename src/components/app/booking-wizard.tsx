@@ -700,7 +700,7 @@ export function BookingWizard({
       <div className="mx-auto max-w-2xl">
         <div className="overflow-hidden rounded-xl2 border border-line bg-paper shadow-soft">
           <div className="relative bg-forest px-6 py-8 text-center text-cream">
-            <div className="pointer-events-none absolute inset-0 opacity-[0.09] [background-image:radial-gradient(#f7f2e6_1px,transparent_1px)] [background-size:22px_22px]" />
+            <div className="pointer-events-none absolute inset-0 opacity-[0.09] bg-[radial-gradient(#f7f2e6_1px,transparent_1px)] bg-size-[22px_22px]" />
             <span className="relative mx-auto flex size-14 items-center justify-center rounded-full bg-wheat text-forest">
               <CheckCircle2 className="size-7" />
             </span>

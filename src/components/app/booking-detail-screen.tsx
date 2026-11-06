@@ -251,7 +251,7 @@ export function BookingDetailScreen({ bookingId, role }: { bookingId: string; ro
             className="h-32 w-full sm:h-40"
             sizes="100vw"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-ink/75 via-ink/25 to-transparent" />
+          <div className="absolute inset-0 bg-linear-to-t from-ink/75 via-ink/25 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-3 p-4 sm:p-5">
             <div>
               <div className="flex flex-wrap items-center gap-1.5">

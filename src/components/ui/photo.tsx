@@ -54,7 +54,7 @@ export function Photo({
         </div>
       )}
       {overlay ? (
-        <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-ink/10 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-t from-ink/70 via-ink/10 to-transparent" />
       ) : null}
     </div>
   );
