@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  checkFarmerRegistered,
   createOtpChallenge,
   createSession,
   isDevOtpEnabledFor,
@@ -53,28 +54,19 @@ export async function POST(request: Request) {
     }
 
     // 1. Farmer Second-Time Login Flow:
-    // If farmer has already registered their data in storage, directly log in to dashboard without OTP.
-    if (existing && existing.role === "farmer") {
-      const farmerProfile = db.farmerProfiles.find((p) => p.userId === existing.id);
-      const hasFarmerData = Boolean(
-        farmerProfile &&
-        farmerProfile.village &&
-        farmerProfile.village !== "Demo Village" &&
-        existing.name &&
-        existing.name.trim().length >= 2,
-      );
-      if (hasFarmerData) {
-        await createSession(existing.id);
-        await rememberDevice(existing);
-        return NextResponse.json({
-          ok: true,
-          signedIn: true,
-          isNew: false,
-          mobile,
-          role: "farmer",
-          name: existing.name,
-        });
-      }
+    // If farmer has already registered their data in storage (database/Supabase), directly log in to dashboard without asking for details.
+    const farmerCheck = checkFarmerRegistered(db, mobile);
+    if (farmerCheck.isRegistered && farmerCheck.user) {
+      await createSession(farmerCheck.user.id);
+      await rememberDevice(farmerCheck.user);
+      return NextResponse.json({
+        ok: true,
+        signedIn: true,
+        isNew: false,
+        mobile,
+        role: "farmer",
+        name: farmerCheck.user.name,
+      });
     }
 
     // 2. Tractor Owner Subsequent Login Flow:

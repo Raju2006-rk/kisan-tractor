@@ -12,6 +12,7 @@ import {
   isSupabaseDatabaseConfigured,
 } from "./supabase";
 import type {
+  Database,
   FarmerProfile,
   Language,
   OwnerProfile,
@@ -267,6 +268,43 @@ async function findSupabaseIdentity(
     console.warn("[auth] Could not read Supabase identity:", error);
     return null;
   }
+}
+
+/**
+ * Checks if a farmer's profile data is already stored in the database / Supabase.
+ * If data exists (custom name or valid village/address), returning farmers are
+ * directly routed to the dashboard without asking for registration details again.
+ * This applies ONLY to farmers, not tractor owners.
+ */
+export function checkFarmerRegistered(
+  db: Database,
+  mobile: string,
+): {
+  isRegistered: boolean;
+  user?: User;
+  profile?: FarmerProfile;
+} {
+  const cleanMobile = normalizeMobile(mobile);
+  const user = db.users.find((u) => normalizeMobile(u.mobile) === cleanMobile);
+  if (!user || user.role !== "farmer") {
+    return { isRegistered: false };
+  }
+  const profile = db.farmerProfiles.find((p) => p.userId === user.id);
+  const hasLocation = Boolean(
+    profile && (
+      (profile.village && profile.village.trim().length > 0 && profile.village.trim().toLowerCase() !== "demo village") ||
+      (profile.address && profile.address.trim().length > 0 && !profile.address.startsWith("GPS:")) ||
+      (profile.district && profile.district.trim().length > 0)
+    ),
+  );
+  const hasCustomName = Boolean(
+    user.name &&
+    user.name.trim().length >= 2 &&
+    user.name.trim().toLowerCase() !== "farmer",
+  );
+  // Registered if either location or custom farmer name was saved with a profile
+  const isRegistered = Boolean(hasLocation || (hasCustomName && profile));
+  return { isRegistered, user, profile };
 }
 
 /**

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  checkFarmerRegistered,
   createSession,
   findOrCreateUser,
   isValidMobile,
@@ -86,17 +87,12 @@ export async function POST(request: Request) {
     await rememberDevice(user);
 
     const fresh = await getDb();
-    const farmerProf = fresh.farmerProfiles.find((p) => p.userId === user.id);
+    const farmerCheck = checkFarmerRegistered(fresh, mobile);
+    const hasFarmerDetails = user.role === "farmer" ? farmerCheck.isRegistered : false;
+    const farmerProf = farmerCheck.profile ?? fresh.farmerProfiles.find((p) => p.userId === user.id);
     const ownerProf = fresh.ownerProfiles.find((p) => p.userId === user.id);
     const profile = user.role === "owner" ? ownerProf : farmerProf;
     const hasTractor = fresh.tractors.some((t) => t.ownerId === user.id);
-    const hasFarmerDetails = Boolean(
-      farmerProf &&
-      farmerProf.village &&
-      farmerProf.village !== "Demo Village" &&
-      user.name &&
-      user.name.trim().length >= 2,
-    );
 
     return NextResponse.json({
       ok: true,
