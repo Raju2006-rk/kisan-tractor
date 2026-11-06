@@ -521,6 +521,7 @@ function FarmerOnboardingView({
 }) {
   const { t } = useI18n();
   const { push } = useToast();
+  const [entryMode, setEntryMode] = useState<"auto" | "manual">("auto");
   const [name, setName] = useState(initialName || user?.name || "");
   const [village, setVillage] = useState(user?.farmerProfile?.village ?? "");
   const [address, setAddress] = useState(user?.farmerProfile?.address ?? "");
@@ -551,14 +552,36 @@ function FarmerOnboardingView({
           const lng = Number(pos.coords.longitude.toFixed(6));
           setCoords({ lat, lng });
           const geo = await reverseGeocode(lat, lng);
-          if (geo.village) setVillage(geo.village);
-          if (geo.pincode) setPincode(geo.pincode);
-          if (geo.district) setDistrict(geo.district);
-          if (geo.state) setState(geo.state);
-          if (geo.address) setAddress(geo.address);
+          
+          let detVillage = geo.village || "";
+          let detPincode = geo.pincode || "";
+          const detDistrict = geo.district || "";
+          const detState = geo.state || "";
+          const detAddress = geo.address || "";
+
+          // Fallback extraction from address string if needed
+          if (!detPincode && detAddress) {
+            const pinMatch = detAddress.match(/\b\d{6}\b/);
+            if (pinMatch) detPincode = pinMatch[0];
+          }
+          if (!detVillage && detAddress) {
+            const parts = detAddress.split(",").map((s) => s.trim()).filter(Boolean);
+            if (parts.length > 0 && !/^\d+$/.test(parts[0])) {
+              detVillage = parts[0];
+            }
+          }
+
+          if (detVillage) setVillage(detVillage);
+          if (detPincode) setPincode(detPincode);
+          if (detDistrict) setDistrict(detDistrict);
+          if (detState) setState(detState);
+          if (detAddress) setAddress(detAddress);
+
+          const summaryParts = [detVillage, detDistrict, detState, detPincode].filter(Boolean);
           setDetectedSummary(
-            [geo.village, geo.district, geo.pincode].filter(Boolean).join(", ") ||
-              `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+            summaryParts.length > 0
+              ? summaryParts.join(", ")
+              : `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
           );
           push(t("app.profileUpdated") || "Location auto-detected!", "success");
         } catch {
@@ -569,9 +592,9 @@ function FarmerOnboardingView({
       },
       () => {
         setLocating(false);
-        setError("Location permission denied or unavailable. Please type your village.");
+        setError("Location permission denied or unavailable. Please enter your address manually.");
       },
-      { timeout: 12000, enableHighAccuracy: true },
+      { timeout: 15000, enableHighAccuracy: true },
     );
   }
 
@@ -632,6 +655,41 @@ function FarmerOnboardingView({
         Please fill in your name and location details to connect with nearby tractor owners and start booking.
       </p>
 
+      {/* Two Clear Options for Location Entry */}
+      <div className="mt-5 grid grid-cols-2 gap-2 rounded-2xl border border-line bg-cream/50 p-1">
+        <button
+          type="button"
+          onClick={() => {
+            setEntryMode("auto");
+            if (!detectedSummary && !coords) {
+              handleAutoDetect();
+            }
+          }}
+          className={cn(
+            "flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold transition",
+            entryMode === "auto"
+              ? "bg-forest text-cream shadow"
+              : "text-stone hover:text-forest",
+          )}
+        >
+          <LocateFixed className="size-3.5" />
+          Auto-Detect Location
+        </button>
+        <button
+          type="button"
+          onClick={() => setEntryMode("manual")}
+          className={cn(
+            "flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold transition",
+            entryMode === "manual"
+              ? "bg-forest text-cream shadow"
+              : "text-stone hover:text-forest",
+          )}
+        >
+          <MapPin className="size-3.5" />
+          Manual Address Input
+        </button>
+      </div>
+
       {error ? (
         <Alert tone="danger" className="mt-4">
           {error}
@@ -650,31 +708,33 @@ function FarmerOnboardingView({
           />
         </Field>
 
-        <div className="rounded-2xl border border-line/70 bg-cream/40 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold text-forest">Auto-Detect Farm Location</p>
-              <p className="text-[0.65rem] text-stone">Use your current GPS coordinates to fill village and PIN</p>
+        {entryMode === "auto" ? (
+          <div className="rounded-2xl border border-line/70 bg-cream/40 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold text-forest">Auto-Detect Farm Location</p>
+                <p className="text-[0.65rem] text-stone">Use high-accuracy GPS to automatically fill village, PIN code, and district</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                loading={locating}
+                onClick={handleAutoDetect}
+                className="gap-1.5 shrink-0"
+              >
+                <LocateFixed className="size-3.5" />
+                {locating ? "Detecting..." : "Detect Location"}
+              </Button>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              loading={locating}
-              onClick={handleAutoDetect}
-              className="gap-1.5 shrink-0"
-            >
-              <LocateFixed className="size-3.5" />
-              {locating ? "Locating..." : "Auto-Detect"}
-            </Button>
+            {detectedSummary ? (
+              <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-forest/8 px-3 py-2 text-xs font-medium text-forest">
+                <Check className="size-4 shrink-0 text-emerald-600" />
+                <span><strong>Detected:</strong> {detectedSummary}</span>
+              </div>
+            ) : null}
           </div>
-          {detectedSummary ? (
-            <div className="mt-2.5 flex items-center gap-1.5 rounded-xl bg-forest/8 px-3 py-1.5 text-xs font-medium text-forest">
-              <MapPin className="size-3.5 shrink-0" />
-              <span>Detected: {detectedSummary}</span>
-            </div>
-          ) : null}
-        </div>
+        ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Village / Town" htmlFor="farmer-village" required>
@@ -686,7 +746,7 @@ function FarmerOnboardingView({
               required
             />
           </Field>
-          <Field label="PIN Code" htmlFor="farmer-pincode">
+          <Field label="PIN Code (6 Digits)" htmlFor="farmer-pincode">
             <Input
               id="farmer-pincode"
               inputMode="numeric"
@@ -698,7 +758,7 @@ function FarmerOnboardingView({
           </Field>
         </div>
 
-        <Field label="Farm Address / Landmark" htmlFor="farmer-address">
+        <Field label="Detailed Farm Address / Landmark" htmlFor="farmer-address">
           <Input
             id="farmer-address"
             value={address}

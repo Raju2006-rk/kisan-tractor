@@ -331,35 +331,28 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     const snapFarmer = decoded?.farmerProfile;
     const snapOwner = decoded?.ownerProfile;
 
-    // The signed cookie carries the last profile values this user saved. Prefer
-    // them over the stored record so a read that races a write cannot revert a
-    // saved village or auto-detected coordinates. Sensitive fields stay in the
-    // store only.
-    const farmerProfile: FarmerProfile | undefined = snapFarmer
+    // Prefer stored database record over cookie snapshot so freshly saved
+    // village, address, PIN code or GPS coordinates take immediate effect and
+    // are not overwritten by an older session snapshot.
+    const farmerProfile: FarmerProfile | undefined = dbFarmer
       ? {
-          ...(dbFarmer ?? {}),
-          ...snapFarmer,
-          documents: dbFarmer?.documents ?? snapFarmer.documents,
+          ...(snapFarmer ?? {}),
+          ...dbFarmer,
+          documents: dbFarmer.documents ?? snapFarmer?.documents,
         }
-      : dbFarmer;
+      : snapFarmer;
 
-    let ownerProfile: OwnerProfile | undefined = snapOwner
+    let ownerProfile: OwnerProfile | undefined = dbOwner
       ? {
-          ...(dbOwner ?? {}),
-          ...snapOwner,
-          documents: dbOwner?.documents ?? snapOwner.documents,
+          ...(snapOwner ?? {}),
+          ...dbOwner,
+          documents: dbOwner.documents ?? snapOwner?.documents,
           payment: {
-            ...snapOwner.payment,
-            upiId: dbOwner?.payment.upiId || snapOwner.payment.upiId,
-            qrImage: dbOwner?.payment.qrImage || snapOwner.payment.qrImage,
-            bankAccountNumber:
-              dbOwner?.payment.bankAccountNumber ||
-              snapOwner.payment.bankAccountNumber,
-            bankIfsc:
-              dbOwner?.payment.bankIfsc || snapOwner.payment.bankIfsc,
+            ...(snapOwner?.payment ?? {}),
+            ...(dbOwner.payment ?? {}),
           },
         }
-      : dbOwner;
+      : snapOwner;
 
     if (dbUser.role === "owner" && !ownerProfile) {
       ownerProfile = {

@@ -5,6 +5,7 @@ import {
   OwnerDashboard,
 } from "@/components/app/farmer-dashboard";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {

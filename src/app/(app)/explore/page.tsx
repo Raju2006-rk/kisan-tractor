@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { ExploreScreen } from "@/components/app/explore-screen";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Explore tractors" };
 
 export default async function ExplorePage() {

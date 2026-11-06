@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { OwnerTractorScreen } from "@/components/app/owner-tractor-screen";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "My tractor" };
 
 export default async function OwnerTractorPage() {

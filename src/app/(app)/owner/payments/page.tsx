@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { OwnerPaymentsScreen } from "@/components/app/owner-payments-screen";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Payment details" };
 
 export default async function OwnerPaymentsPage() {

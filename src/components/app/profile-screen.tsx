@@ -234,9 +234,23 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
             : {}),
         }),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await response.json()) as { error?: string; user?: SessionUser };
       if (!response.ok) throw new Error(result.error ?? t("app.couldNotSaveProfile"));
       setSaved(true);
+      if (result.user) {
+        setName(result.user.name);
+        const p = result.user.farmerProfile ?? result.user.ownerProfile;
+        if (p) {
+          setVillage(p.village ?? "");
+          setAddress(p.address ?? "");
+          setPincode(p.pincode ?? "");
+          setDistrict(p.district ?? "");
+          setStateName(p.state ?? "");
+          if (p.lat && p.lng) {
+            setCoords({ lat: p.lat, lng: p.lng });
+          }
+        }
+      }
       push(t("app.profileUpdated"), "success");
       router.refresh();
     } catch (saveError) {
