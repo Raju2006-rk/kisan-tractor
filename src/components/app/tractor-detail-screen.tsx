@@ -103,7 +103,7 @@ export function TractorDetailScreen({
   const lowest = rates.find((rate) => rate.rate === lowestRate);
   const isOwnerViewing = user.role === "owner";
   const isOwnTractor = tractor.ownerId === user.id;
-  const canBook = user.role === "farmer" && tractor.isAvailable;
+  const canBook = !isOwnTractor;
   const bookHref = `/book?tractor=${encodeURIComponent(tractor.id)}`;
 
   return (
@@ -328,6 +328,12 @@ export function TractorDetailScreen({
                 </div>
               ) : null}
 
+              {!tractor.ownerProfile.online ? (
+                <div className="rounded-xl border border-wheat/70 bg-wheat/20 px-3.5 py-2.5 text-[0.7rem] leading-relaxed text-[#6d5118]">
+                  {t("tractor.offlineNote")}
+                </div>
+              ) : null}
+
               {canBook ? (
                 <>
                   <LinkButton href={bookHref} size="lg" className="w-full">
@@ -341,10 +347,6 @@ export function TractorDetailScreen({
                     <UserRound className="size-3.5" /> {t("app.bookForSomeone")}
                   </LinkButton>
                 </>
-              ) : !isOwnerViewing ? (
-                <div className="rounded-xl border border-wheat/70 bg-wheat/20 px-3.5 py-3 text-[0.7rem] leading-relaxed text-[#6d5118]">
-                  {t("tractor.offlineNote")}
-                </div>
               ) : null}
 
               <p className="flex items-start gap-2 text-[0.65rem] leading-relaxed text-stone">

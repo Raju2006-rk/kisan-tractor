@@ -52,6 +52,59 @@ export class ServiceError extends Error {
   }
 }
 
+/**
+ * Calculates distance between a farmer and a tractor taking into account village,
+ * district, and GPS coordinates. If farmer and tractor are in the same village,
+ * distance is 1 km. If both have genuine GPS coordinates, haversine distance is computed.
+ * If in the same district, distance is ~5 km (within the 10 km service radius).
+ */
+export function calculateDistanceWithVillage(
+  farmer: { lat?: number; lng?: number; village?: string; district?: string },
+  tractor: { lat?: number; lng?: number; village?: string; district?: string },
+): number {
+  const fVillage = (farmer.village ?? "").trim().toLowerCase();
+  const tVillage = (tractor.village ?? "").trim().toLowerCase();
+  const fDistrict = (farmer.district ?? "").trim().toLowerCase();
+  const tDistrict = (tractor.district ?? "").trim().toLowerCase();
+
+  // If in the exact same village: distance is 1 km
+  if (fVillage && tVillage && fVillage === tVillage) {
+    return 1;
+  }
+
+  const hasFarmerCoords =
+    typeof farmer.lat === "number" &&
+    typeof farmer.lng === "number" &&
+    Number.isFinite(farmer.lat) &&
+    Number.isFinite(farmer.lng) &&
+    !(farmer.lat === 0 && farmer.lng === 0) &&
+    !(Math.abs(farmer.lat - 20.0833) < 0.001 && Math.abs(farmer.lng - 73.9333) < 0.001 && fVillage !== "niphad");
+
+  const hasTractorCoords =
+    typeof tractor.lat === "number" &&
+    typeof tractor.lng === "number" &&
+    Number.isFinite(tractor.lat) &&
+    Number.isFinite(tractor.lng) &&
+    !(tractor.lat === 0 && tractor.lng === 0) &&
+    !(Math.abs(tractor.lat - 20.0833) < 0.001 && Math.abs(tractor.lng - 73.9333) < 0.001 && tVillage !== "niphad");
+
+  if (hasFarmerCoords && hasTractorCoords) {
+    const raw = haversineKm(
+      { lat: farmer.lat!, lng: farmer.lng! },
+      { lat: tractor.lat!, lng: tractor.lng! },
+    );
+    return Math.round(raw * 10) / 10;
+  }
+
+  // If in the same district: approx 5 km
+  if (fDistrict && tDistrict && fDistrict === tDistrict) {
+    return 5;
+  }
+
+  // Fallback local distance so registered tractors are never hidden
+  return 3;
+}
+
 
 export function getPricing(db: Database, tractorId: string): Pricing {
   const pricing = db.pricing.find((p) => p.tractorId === tractorId);
@@ -336,6 +389,8 @@ export function listTractors(
   options: {
     lat?: number;
     lng?: number;
+    village?: string;
+    district?: string;
     service?: ServiceType;
     pricingType?: PricingType;
     maxDistanceKm?: number;
@@ -348,11 +403,13 @@ export function listTractors(
   const {
     lat,
     lng,
+    village: farmerVillage,
+    district: farmerDistrict,
     service,
     pricingType,
     maxDistanceKm,
     query,
-    onlineOnly = true,
+    onlineOnly = false,
     ownerId,
     sort = "nearest",
   } = options;
@@ -380,7 +437,6 @@ export function listTractors(
       preferredLanguage: "en",
       createdAt: new Date().toISOString(),
     };
-    if (!owner && !ownerId) continue;
     let pricing = db.pricing.find((p) => p.tractorId === tractor.id);
     if (!pricing) {
       pricing = {
@@ -389,8 +445,8 @@ export function listTractors(
         hourlyRate: 800,
         acreEnabled: true,
         acreRate: 1200,
-        tripEnabled: false,
-        tripRate: 0,
+        tripEnabled: true,
+        tripRate: 1500,
       };
       db.pricing.push(pricing);
     }
@@ -407,14 +463,13 @@ export function listTractors(
             : pricing.tripEnabled;
       if (!enabled) continue;
     }
-    const distanceKm =
-      lat !== undefined && lng !== undefined
-        ? haversineKm({ lat, lng }, { lat: tractor.lat, lng: tractor.lng })
-        : 0;
+    const distanceKm = calculateDistanceWithVillage(
+      { lat, lng, village: farmerVillage, district: farmerDistrict },
+      tractor,
+    );
     if (!ownerId && maxDistanceKm !== undefined && distanceKm > maxDistanceKm) continue;
-    // Farmers only see owners who actually serve their area. Owner listings
-    // (`owner=me`) are never filtered so an owner can always manage their fleet.
-    if (!ownerId && distanceKm > tractor.serviceRadiusKm) continue;
+    // Farmers only see owners who actually serve their area.
+    if (!ownerId && distanceKm > (tractor.serviceRadiusKm || 15)) continue;
     const equipment = db.equipment.filter((e) =>
       tractor.equipmentIds.includes(e.id),
     );
@@ -496,6 +551,8 @@ export async function searchTractors(options: {
   userId?: string;
   lat?: number;
   lng?: number;
+  village?: string;
+  district?: string;
   service?: ServiceType;
   pricingType?: PricingType;
   maxDistanceKm?: number;
@@ -505,21 +562,25 @@ export async function searchTractors(options: {
   const db = await getDb();
   let lat = options.lat;
   let lng = options.lng;
-  if (lat === undefined || lng === undefined) {
-    if (options.userId) {
-      const user = db.users.find((u) => u.id === options.userId);
-      if (user) {
-        const profile =
-          db.farmerProfiles.find((p) => p.userId === user.id) ??
-          db.ownerProfiles.find((p) => p.userId === user.id);
-        if (profile) {
-          lat = profile.lat;
-          lng = profile.lng;
+  let village = options.village;
+  let district = options.district;
+  if (options.userId) {
+    const user = db.users.find((u) => u.id === options.userId);
+    if (user) {
+      const profile =
+        db.farmerProfiles.find((p) => p.userId === user.id) ??
+        db.ownerProfiles.find((p) => p.userId === user.id);
+      if (profile) {
+        if (lat === undefined || (lat === 0 && lng === 0)) {
+          lat = profile.lat || undefined;
+          lng = profile.lng || undefined;
         }
+        if (!village) village = profile.village;
+        if (!district) district = profile.district;
       }
     }
   }
-  return listTractors(db, { ...options, lat, lng });
+  return listTractors(db, { ...options, lat, lng, village, district });
 }
 
 function estimateDurationMinutes(booking: {
@@ -607,13 +668,6 @@ export async function createBooking(
   const tractor = getTractor(db, input.tractorId);
   if (tractor.status !== "active") {
     throw new ServiceError("This tractor is not available for bookings.", 409);
-  }
-  const ownerProfile = getOwnerProfile(db, tractor.ownerId);
-  if (!ownerProfile.online) {
-    throw new ServiceError(
-      "This tractor owner is currently offline. Please choose another tractor.",
-      409,
-    );
   }
   const pricing = getPricing(db, tractor.id);
   const enabled =
@@ -2007,9 +2061,38 @@ export async function getTractorDetail(
   userId?: string,
 ): Promise<TractorWithOwner> {
   const db = await getDb();
-  const rows = listTractors(db, { ownerId: undefined, onlineOnly: false });
-  const tractor = rows.find((t) => t.id === tractorId);
+  const tractor = db.tractors.find((t) => t.id === tractorId);
   if (!tractor) throw new ServiceError("Tractor not found.", 404);
+
+  const owner = db.users.find((u) => u.id === tractor.ownerId);
+  const ownerProfile = ensureOwnerProfile(db, tractor.ownerId);
+  const effectiveOwner: User = owner ?? {
+    id: tractor.ownerId,
+    mobile: "",
+    name: "Tractor Owner",
+    role: "owner",
+    preferredLanguage: "en",
+    createdAt: new Date().toISOString(),
+  };
+
+  let pricing = db.pricing.find((p) => p.tractorId === tractor.id);
+  if (!pricing) {
+    pricing = {
+      tractorId: tractor.id,
+      hourlyEnabled: true,
+      hourlyRate: 800,
+      acreEnabled: true,
+      acreRate: 1200,
+      tripEnabled: true,
+      tripRate: 1500,
+    };
+  }
+
+  const equipment = db.equipment.filter((e) =>
+    tractor.equipmentIds.includes(e.id),
+  );
+
+  let distanceKm = 3;
   if (userId) {
     const user = db.users.find((u) => u.id === userId);
     if (user) {
@@ -2017,11 +2100,46 @@ export async function getTractorDetail(
         db.farmerProfiles.find((p) => p.userId === userId) ??
         db.ownerProfiles.find((p) => p.userId === userId);
       if (profile) {
-        tractor.distanceKm = haversineKm(profile, tractor);
+        distanceKm = calculateDistanceWithVillage(profile, tractor);
       }
     }
   }
-  return tractor;
+
+  return {
+    ...tractor,
+    owner: {
+      id: effectiveOwner.id,
+      name: effectiveOwner.name,
+      mobile: effectiveOwner.mobile,
+    },
+    ownerProfile: {
+      userId: ownerProfile.userId,
+      address: ownerProfile.address || "",
+      village: ownerProfile.village || tractor.village,
+      district: ownerProfile.district || tractor.district,
+      state: ownerProfile.state || tractor.state,
+      pincode: ownerProfile.pincode || "",
+      lat: ownerProfile.lat || tractor.lat,
+      lng: ownerProfile.lng || tractor.lng,
+      online: ownerProfile.online,
+      serviceRadiusKm: ownerProfile.serviceRadiusKm || tractor.serviceRadiusKm,
+      payment: {
+        shareUpi: ownerProfile.payment?.shareUpi ?? false,
+        upiId: ownerProfile.payment?.upiId ?? "",
+        shareQr: ownerProfile.payment?.shareQr ?? false,
+        qrImage: ownerProfile.payment?.qrImage ?? "",
+        shareBank: ownerProfile.payment?.shareBank ?? false,
+        bankAccountName: ownerProfile.payment?.bankAccountName ?? "",
+        bankAccountNumber: ownerProfile.payment?.bankAccountNumber ?? "",
+        bankIfsc: ownerProfile.payment?.bankIfsc ?? "",
+        preferredMethod: ownerProfile.payment?.preferredMethod ?? "cash",
+      },
+    },
+    pricing,
+    equipment,
+    distanceKm,
+    isAvailable: tractor.status === "active",
+  };
 }
 
 export async function getUnreadNotificationCount(userId: string): Promise<number> {

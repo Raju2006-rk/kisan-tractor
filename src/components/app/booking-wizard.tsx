@@ -33,6 +33,7 @@ import {
   Card,
   Field,
   Input,
+  Skeleton,
   Textarea,
   buttonStyles,
 } from "@/components/ui/primitives";
@@ -571,7 +572,6 @@ export function BookingWizard({
   function validateStep(current: number): string | null {
     if (current === 0) {
       if (!selectedTractor) return t("app.chooseTractorError");
-      if (!selectedTractor.isAvailable) return t("app.ownerOfflineError");
     }
     if (current === 1) {
       if (!selectedTractor) return t("app.chooseTractorError");
@@ -855,6 +855,24 @@ export function BookingWizard({
                       }}
                     />
                   ))}
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {step === 1 && !selectedTractor ? (
+            <div className="space-y-4 py-8 text-center">
+              {listLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="mx-auto h-6 w-1/2" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm font-semibold text-forest">{t("app.chooseTractorError")}</p>
+                  <Button type="button" size="sm" onClick={() => setStep(0)} className="mt-3">
+                    {t("app.stepTractor")}
+                  </Button>
                 </div>
               )}
             </div>
