@@ -77,6 +77,7 @@ class _TractorRegistrationScreenState extends State<TractorRegistrationScreen> {
   Future<void> _detectLocation() async {
     setState(() => _isLocating = true);
     final loc = await LocationService.getCurrentLocation();
+    if (!mounted) return;
     setState(() => _isLocating = false);
 
     if (loc != null) {
@@ -87,14 +88,12 @@ class _TractorRegistrationScreenState extends State<TractorRegistrationScreen> {
         if (loc.pincode.isNotEmpty) _pincodeController.text = loc.pincode;
         _detectedLocation = loc.summary;
       });
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Tractor base location detected: ${_detectedLocation!}'),
-            backgroundColor: AppTheme.forest,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Tractor base location detected: ${_detectedLocation!}'),
+          backgroundColor: AppTheme.forest,
+        ),
+      );
     }
   }
 
@@ -190,6 +189,7 @@ class _TractorRegistrationScreenState extends State<TractorRegistrationScreen> {
                                 setState(() => _currentStep++);
                               } else {
                                 // Final Save
+                                final navigator = Navigator.of(context);
                                 final success = await auth.completeTractorRegistration(
                                   brand: _brandController.text.trim(),
                                   model: _modelController.text.trim(),
@@ -209,9 +209,8 @@ class _TractorRegistrationScreenState extends State<TractorRegistrationScreen> {
                                   lat: _lat,
                                   lng: _lng,
                                 );
-                                if (success && context.mounted) {
-                                  Navigator.pushReplacement(
-                                    context,
+                                if (success) {
+                                  navigator.pushReplacement(
                                     MaterialPageRoute(builder: (_) => const OwnerDashboardScreen()),
                                   );
                                 }

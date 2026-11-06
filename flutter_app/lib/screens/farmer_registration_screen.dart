@@ -53,23 +53,19 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         if (loc.address.isNotEmpty) _addressController.text = loc.address;
         _detectedSummary = loc.summary;
       });
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Location detected: ${_detectedSummary ?? "GPS captured"}'),
-            backgroundColor: AppTheme.forest,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Location detected: ${_detectedSummary ?? "GPS captured"}'),
+          backgroundColor: AppTheme.forest,
+        ),
+      );
     } else {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not access GPS. Please enter your village manually.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not access GPS. Please enter your village manually.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
   }
 
@@ -353,6 +349,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                             return;
                           }
 
+                          final navigator = Navigator.of(context);
                           final success = await auth.completeFarmerRegistration(
                             name: name,
                             village: village,
@@ -366,9 +363,8 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                             lng: _lng,
                           );
 
-                          if (success && context.mounted) {
-                            Navigator.pushReplacement(
-                              context,
+                          if (success) {
+                            navigator.pushReplacement(
                               MaterialPageRoute(builder: (_) => const FarmerDashboardScreen()),
                             );
                           }

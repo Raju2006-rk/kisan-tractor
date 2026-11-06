@@ -134,13 +134,11 @@ class _LanguageGatewayScreenState extends State<LanguageGatewayScreen> {
                 height: 52,
                 child: ElevatedButton(
                   onPressed: () async {
+                    final navigator = Navigator.of(context);
                     await localeProvider.selectLanguage(_selected);
-                    if (context.mounted) {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AuthScreen()),
-                      );
-                    }
+                    navigator.pushReplacement(
+                      MaterialPageRoute(builder: (_) => const AuthScreen()),
+                    );
                   },
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,

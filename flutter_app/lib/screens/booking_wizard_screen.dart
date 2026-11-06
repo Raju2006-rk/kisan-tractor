@@ -55,6 +55,7 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
   Future<void> _detectLocation() async {
     setState(() => _isLocating = true);
     final loc = await LocationService.getCurrentLocation();
+    if (!mounted) return;
     setState(() => _isLocating = false);
 
     if (loc != null) {
@@ -64,14 +65,12 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
         if (loc.village.isNotEmpty) _villageController.text = loc.village;
         if (loc.address.isNotEmpty) _farmLabelController.text = loc.address;
       });
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Farm location detected: ${loc.summary}'),
-            backgroundColor: AppTheme.forest,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Farm location detected: ${loc.summary}'),
+          backgroundColor: AppTheme.forest,
+        ),
+      );
     }
   }
 
@@ -97,13 +96,13 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
       lng: _lng,
     );
 
+    if (!mounted) return;
     setState(() => _isSubmitting = false);
 
-    if (context.mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
           backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           content: Column(
@@ -147,7 +146,6 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
           ),
         ),
       );
-    }
   }
 
   @override

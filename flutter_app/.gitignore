@@ -4,4 +4,7 @@
 .packages
 build/
 *.lock
+.idea/
+*.iml
+
 

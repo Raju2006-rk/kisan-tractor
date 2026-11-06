@@ -63,13 +63,11 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
           IconButton(
             icon: const Icon(Icons.logout, color: AppTheme.stone),
             onPressed: () async {
+              final navigator = Navigator.of(context);
               await auth.logout();
-              if (context.mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AuthScreen()),
-                );
-              }
+              navigator.pushReplacement(
+                MaterialPageRoute(builder: (_) => const AuthScreen()),
+              );
             },
           ),
         ],

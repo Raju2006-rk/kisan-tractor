@@ -242,7 +242,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               role: _selectedRole,
                               language: locale.currentLanguage,
                             );
-                            if (success && context.mounted) {
+                            if (success && mounted) {
                               _routeNext(auth);
                             }
                           },
@@ -335,7 +335,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               otp,
                               language: locale.currentLanguage,
                             );
-                            if (success && context.mounted) {
+                            if (success && mounted) {
                               _routeNext(auth);
                             }
                           },
@@ -406,7 +406,7 @@ class _RoleCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),

@@ -52,13 +52,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           IconButton(
             icon: const Icon(Icons.logout, color: AppTheme.stone),
             onPressed: () async {
+              final navigator = Navigator.of(context);
               await auth.logout();
-              if (context.mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AuthScreen()),
-                );
-              }
+              navigator.pushReplacement(
+                MaterialPageRoute(builder: (_) => const AuthScreen()),
+              );
             },
           ),
         ],
@@ -129,7 +127,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       ),
                       Switch(
                         value: _isOnline,
-                        activeColor: AppTheme.wheat,
+                        activeThumbColor: AppTheme.wheat,
                         activeTrackColor: AppTheme.wheatOpacity40,
                         onChanged: (val) {
                           setState(() => _isOnline = val);
