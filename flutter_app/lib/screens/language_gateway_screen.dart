@@ -31,7 +31,7 @@ class _LanguageGatewayScreenState extends State<LanguageGatewayScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
-                  color: AppTheme.forest.withOpacity(0.08),
+                  color: AppTheme.forestOpacity08,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
@@ -91,11 +91,11 @@ class _LanguageGatewayScreenState extends State<LanguageGatewayScreen> {
                             color: isSelected ? AppTheme.forest : AppTheme.line,
                             width: isSelected ? 2 : 1,
                           ),
-                          boxShadow: [
+                          boxShadow: const [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
+                              color: Color(0x08000000),
                               blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              offset: Offset(0, 2),
                             ),
                           ],
                         ),
@@ -116,7 +116,7 @@ class _LanguageGatewayScreenState extends State<LanguageGatewayScreen> {
                               lang.name,
                               style: TextStyle(
                                 color: isSelected
-                                    ? AppTheme.wheat.withOpacity(0.9)
+                                    ? AppTheme.wheatOpacity90
                                     : AppTheme.stone,
                                 fontSize: 12,
                               ),
@@ -135,7 +135,7 @@ class _LanguageGatewayScreenState extends State<LanguageGatewayScreen> {
                 child: ElevatedButton(
                   onPressed: () async {
                     await localeProvider.selectLanguage(_selected);
-                    if (mounted) {
+                    if (context.mounted) {
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(builder: (_) => const AuthScreen()),
@@ -160,4 +160,3 @@ class _LanguageGatewayScreenState extends State<LanguageGatewayScreen> {
     );
   }
 }
-

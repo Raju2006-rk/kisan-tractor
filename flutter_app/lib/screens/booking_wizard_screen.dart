@@ -64,7 +64,7 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
         if (loc.village.isNotEmpty) _villageController.text = loc.village;
         if (loc.address.isNotEmpty) _farmLabelController.text = loc.address;
       });
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Farm location detected: ${loc.summary}'),
@@ -82,7 +82,7 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
     final startTime =
         '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}';
 
-    final booking = await ApiService.createBooking(
+    await ApiService.createBooking(
       tractorId: widget.tractor.id,
       serviceType: _serviceType,
       pricingType: _pricingType,
@@ -99,7 +99,7 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
 
     setState(() => _isSubmitting = false);
 
-    if (mounted) {
+    if (context.mounted) {
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -411,7 +411,7 @@ class _BookingWizardScreenState extends State<BookingWizardScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppTheme.wheat.withOpacity(0.4),
+                  color: AppTheme.wheatOpacity40,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppTheme.wheat),
                 ),

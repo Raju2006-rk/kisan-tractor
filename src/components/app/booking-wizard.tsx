@@ -1446,7 +1446,7 @@ export function BookingWizard({
                   type="checkbox"
                   checked={agreed}
                   onChange={(event) => setAgreed(event.target.checked)}
-                  className="mt-0.5 size-4 accent-[#163b2a]"
+                  className="mt-0.5 size-4 accent-forest"
                 />
                 <span>
                   {t("app.agreeRequestNotConfirmed")}

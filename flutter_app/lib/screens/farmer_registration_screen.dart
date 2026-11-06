@@ -39,6 +39,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
   Future<void> _handleAutoDetect() async {
     setState(() => _isLocating = true);
     final loc = await LocationService.getCurrentLocation();
+    if (!mounted) return;
     setState(() => _isLocating = false);
 
     if (loc != null) {
@@ -52,7 +53,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         if (loc.address.isNotEmpty) _addressController.text = loc.address;
         _detectedSummary = loc.summary;
       });
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Location detected: ${_detectedSummary ?? "GPS captured"}'),
@@ -61,7 +62,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         );
       }
     } else {
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Could not access GPS. Please enter your village manually.'),
@@ -91,7 +92,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppTheme.forest.withOpacity(0.08),
+                  color: AppTheme.forestOpacity08,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Text(
@@ -186,7 +187,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: AppTheme.forest.withOpacity(0.06),
+                          color: AppTheme.forestOpacity08,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(
@@ -365,7 +366,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                             lng: _lng,
                           );
 
-                          if (success && mounted) {
+                          if (success && context.mounted) {
                             Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(builder: (_) => const FarmerDashboardScreen()),
@@ -396,4 +397,3 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     );
   }
 }
-

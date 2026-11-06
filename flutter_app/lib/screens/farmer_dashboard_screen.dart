@@ -34,11 +34,13 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
     final tractors = await ApiService.fetchTractors(village: village);
     final bookings = await ApiService.fetchBookings();
 
-    setState(() {
-      _tractors = tractors;
-      _bookings = bookings;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _tractors = tractors;
+        _bookings = bookings;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -62,7 +64,7 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
             icon: const Icon(Icons.logout, color: AppTheme.stone),
             onPressed: () async {
               await auth.logout();
-              if (mounted) {
+              if (context.mounted) {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (_) => const AuthScreen()),
@@ -88,11 +90,11 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
                   decoration: BoxDecoration(
                     color: AppTheme.forest,
                     borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
+                    boxShadow: const [
                       BoxShadow(
-                        color: AppTheme.forest.withOpacity(0.2),
+                        color: AppTheme.forestOpacity20,
                         blurRadius: 12,
-                        offset: const Offset(0, 4),
+                        offset: Offset(0, 4),
                       ),
                     ],
                   ),
@@ -144,7 +146,7 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
+                          color: const Color(0x26FFFFFF),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Text(
@@ -184,11 +186,11 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
                     decoration: BoxDecoration(
                       color: AppTheme.clay,
                       borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
+                      boxShadow: const [
                         BoxShadow(
-                          color: AppTheme.clay.withOpacity(0.25),
+                          color: AppTheme.clayOpacity25,
                           blurRadius: 10,
-                          offset: const Offset(0, 4),
+                          offset: Offset(0, 4),
                         ),
                       ],
                     ),
@@ -328,10 +330,10 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
                         ),
                         child: Row(
                           children: [
-                            CircleAvatar(
+                            const CircleAvatar(
                               radius: 18,
-                              backgroundColor: AppTheme.forest.withOpacity(0.08),
-                              child: const Icon(Icons.calendar_today, size: 16, color: AppTheme.forest),
+                              backgroundColor: AppTheme.forestOpacity08,
+                              child: Icon(Icons.calendar_today, size: 16, color: AppTheme.forest),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -354,7 +356,7 @@ class _FarmerDashboardScreenState extends State<FarmerDashboardScreen> {
                               decoration: BoxDecoration(
                                 color: booking.status == 'COMPLETED'
                                     ? Colors.green.shade50
-                                    : AppTheme.wheat.withOpacity(0.5),
+                                    : AppTheme.wheatOpacity50,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -396,11 +398,11 @@ class _TractorCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.line),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Color(0x05000000),
             blurRadius: 8,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -509,4 +511,3 @@ class _TractorCard extends StatelessWidget {
     );
   }
 }
-

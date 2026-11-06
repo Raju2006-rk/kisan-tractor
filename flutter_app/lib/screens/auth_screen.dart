@@ -242,7 +242,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               role: _selectedRole,
                               language: locale.currentLanguage,
                             );
-                            if (success && mounted) {
+                            if (success && context.mounted) {
                               _routeNext(auth);
                             }
                           },
@@ -288,7 +288,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: AppTheme.wheat.withOpacity(0.4),
+                      color: AppTheme.wheatOpacity40,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: AppTheme.wheat),
                     ),
@@ -335,7 +335,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               otp,
                               language: locale.currentLanguage,
                             );
-                            if (success && mounted) {
+                            if (success && context.mounted) {
                               _routeNext(auth);
                             }
                           },

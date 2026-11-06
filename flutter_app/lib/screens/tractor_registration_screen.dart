@@ -87,7 +87,7 @@ class _TractorRegistrationScreenState extends State<TractorRegistrationScreen> {
         if (loc.pincode.isNotEmpty) _pincodeController.text = loc.pincode;
         _detectedLocation = loc.summary;
       });
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Tractor base location detected: ${_detectedLocation!}'),
@@ -209,7 +209,7 @@ class _TractorRegistrationScreenState extends State<TractorRegistrationScreen> {
                                   lat: _lat,
                                   lng: _lng,
                                 );
-                                if (success && mounted) {
+                                if (success && context.mounted) {
                                   Navigator.pushReplacement(
                                     context,
                                     MaterialPageRoute(builder: (_) => const OwnerDashboardScreen()),
@@ -271,10 +271,10 @@ class _TractorRegistrationScreenState extends State<TractorRegistrationScreen> {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
+              gradient: const LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Colors.black.withOpacity(0.6)],
+                colors: [Colors.transparent, Color(0x99000000)],
               ),
             ),
             padding: const EdgeInsets.all(12),
@@ -310,7 +310,7 @@ class _TractorRegistrationScreenState extends State<TractorRegistrationScreen> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: _brandController.text,
+          initialValue: _brandController.text,
           decoration: const InputDecoration(),
           items: brands
               .map((b) => DropdownMenuItem(value: b, child: Text(b)))
@@ -591,7 +591,7 @@ class _TractorRegistrationScreenState extends State<TractorRegistrationScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: AppTheme.forest.withOpacity(0.08),
+                  color: AppTheme.forestOpacity08,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Text('Attached', style: TextStyle(color: AppTheme.forest, fontSize: 11, fontWeight: FontWeight.bold)),

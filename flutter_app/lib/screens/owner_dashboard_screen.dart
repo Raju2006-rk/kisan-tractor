@@ -27,19 +27,18 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   Future<void> _loadBookings() async {
     setState(() => _isLoading = true);
     final bookings = await ApiService.fetchBookings();
-    setState(() {
-      _bookings = bookings;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _bookings = bookings;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
-    final user = auth.currentUser;
-
-    final pending = _bookings.filter((b) => b.status == 'PENDING');
-    final active = _bookings.filter((b) => ['IN_PROGRESS', 'ACCEPTED'].contains(b.status));
+    final pending = _bookings.where((b) => b.status == 'PENDING').toList();
 
     return Scaffold(
       backgroundColor: AppTheme.cream,
@@ -54,7 +53,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
             icon: const Icon(Icons.logout, color: AppTheme.stone),
             onPressed: () async {
               await auth.logout();
-              if (mounted) {
+              if (context.mounted) {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (_) => const AuthScreen()),
@@ -81,11 +80,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     color: _isOnline ? AppTheme.forest : Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: _isOnline ? AppTheme.forest : AppTheme.line),
-                    boxShadow: [
+                    boxShadow: const [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Color(0x0A000000),
                         blurRadius: 10,
-                        offset: const Offset(0, 3),
+                        offset: Offset(0, 3),
                       ),
                     ],
                   ),
@@ -96,7 +95,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                         children: [
                           CircleAvatar(
                             radius: 20,
-                            backgroundColor: _isOnline ? AppTheme.wheat : Colors.grey.shade200,
+                            backgroundColor: _isOnline ? AppTheme.wheat : const Color(0xFFEEEEEE),
                             child: Icon(
                               _isOnline ? Icons.power_settings_new : Icons.power_off,
                               color: _isOnline ? AppTheme.forest : Colors.grey,
@@ -131,7 +130,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       Switch(
                         value: _isOnline,
                         activeColor: AppTheme.wheat,
-                        activeTrackColor: AppTheme.wheat.withOpacity(0.4),
+                        activeTrackColor: AppTheme.wheatOpacity40,
                         onChanged: (val) {
                           setState(() => _isOnline = val);
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -148,7 +147,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 const SizedBox(height: 20),
 
                 // Metrics Row
-                Row(
+                const Row(
                   children: [
                     Expanded(
                       child: _MetricCard(
@@ -158,7 +157,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                         icon: Icons.currency_rupee,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: _MetricCard(
                         title: 'Completed Jobs',
@@ -303,12 +302,6 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   }
 }
 
-extension FilterExtension<T> on List<T> {
-  List<T> filter(bool Function(T) test) {
-    return where(test).toList();
-  }
-}
-
 class _MetricCard extends StatelessWidget {
   final String title;
   final String value;
@@ -351,11 +344,10 @@ class _MetricCard extends StatelessWidget {
           ),
           Text(
             subtitle,
-            style: TextStyle(color: AppTheme.stone.withOpacity(0.7), fontSize: 10),
+            style: const TextStyle(color: Color(0x995B695F), fontSize: 10),
           ),
         ],
       ),
     );
   }
 }
-

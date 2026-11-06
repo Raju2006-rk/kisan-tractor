@@ -14,6 +14,14 @@ class AppTheme {
   static const Color wheat = Color(0xFFF5E4B3);
   static const Color greenAccent = Color(0xFF1F7A4D);
 
+  // Pre-computed transparent colors to avoid deprecated withOpacity
+  static const Color forestOpacity08 = Color(0x14163B2A);
+  static const Color forestOpacity20 = Color(0x33163B2A);
+  static const Color clayOpacity25 = Color(0x40B4552F);
+  static const Color wheatOpacity40 = Color(0x66F5E4B3);
+  static const Color wheatOpacity50 = Color(0x80F5E4B3);
+  static const Color wheatOpacity90 = Color(0xE6F5E4B3);
+
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
@@ -22,7 +30,6 @@ class AppTheme {
         primary: forest,
         secondary: clay,
         surface: paper,
-        background: cream,
         onPrimary: cream,
         onSecondary: Colors.white,
         onSurface: ink,
@@ -63,33 +70,32 @@ class AppTheme {
           ),
         ),
       ),
-      inputDecorationTheme: InputDecorationTheme(
+      inputDecorationTheme: const InputDecorationTheme(
         filled: true,
         fillColor: paper,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: line),
+          borderRadius: BorderRadius.all(Radius.circular(14)),
+          borderSide: BorderSide(color: line),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: line),
+          borderRadius: BorderRadius.all(Radius.circular(14)),
+          borderSide: BorderSide(color: line),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: forest, width: 1.5),
+          borderRadius: BorderRadius.all(Radius.circular(14)),
+          borderSide: BorderSide(color: forest, width: 1.5),
         ),
-        hintStyle: const TextStyle(color: Color(0xFF9EABA2), fontSize: 14),
+        hintStyle: TextStyle(color: Color(0xFF9EABA2), fontSize: 14),
       ),
-      cardTheme: CardTheme(
+      cardTheme: const CardTheme(
         color: paper,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: line),
+          borderRadius: BorderRadius.all(Radius.circular(20)),
+          side: BorderSide(color: line),
         ),
       ),
     );
   }
 }
-
