@@ -358,7 +358,7 @@ function Services() {
             >
               <Link
                 href={`/explore?service=${service.id}`}
-                className="group block overflow-hidden rounded-3xl border border-line bg-paper shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-soft"
+                className="group block overflow-hidden rounded-3xl border border-line bg-paper shadow-(--shadow-card) transition hover:-translate-y-1 hover:shadow-soft"
               >
                 <Photo
                   src={service.image}

@@ -719,7 +719,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
             <div className="space-y-2">
               <Link
                 href="/owner/tractor"
-                className="group flex items-center justify-between gap-3 rounded-2xl border border-line/80 bg-paper p-3.5 shadow-[var(--shadow-card)] transition hover:border-forest/25"
+                className="group flex items-center justify-between gap-3 rounded-2xl border border-line/80 bg-paper p-3.5 shadow-(--shadow-card) transition hover:border-forest/25"
               >
                 <span className="flex items-center gap-2.5">
                   <span className="flex size-9 items-center justify-center rounded-xl bg-forest/8 text-forest">
@@ -736,7 +736,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
               </Link>
               <Link
                 href="/owner/payments"
-                className="group flex items-center justify-between gap-3 rounded-2xl border border-line/80 bg-paper p-3.5 shadow-[var(--shadow-card)] transition hover:border-forest/25"
+                className="group flex items-center justify-between gap-3 rounded-2xl border border-line/80 bg-paper p-3.5 shadow-(--shadow-card) transition hover:border-forest/25"
               >
                 <span className="flex items-center gap-2.5">
                   <span className="flex size-9 items-center justify-center rounded-xl bg-wheat/40 text-[#7a5a1d]">
@@ -755,7 +755,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
           ) : (
             <Link
               href="/explore"
-              className="group flex items-center justify-between gap-3 rounded-2xl border border-line/80 bg-paper p-3.5 shadow-[var(--shadow-card)] transition hover:border-forest/25"
+              className="group flex items-center justify-between gap-3 rounded-2xl border border-line/80 bg-paper p-3.5 shadow-(--shadow-card) transition hover:border-forest/25"
             >
               <span className="flex items-center gap-2.5">
                 <span className="flex size-9 items-center justify-center rounded-xl bg-forest/8 text-forest">

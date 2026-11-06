@@ -140,7 +140,7 @@ export function FarmerDashboard({ user }: { user: SessionUser }) {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
           <Link
             href="/explore"
-            className="group flex items-center justify-between gap-3 rounded-2xl border border-line/80 bg-paper p-4 shadow-[var(--shadow-card)] transition hover:border-forest/25"
+            className="group flex items-center justify-between gap-3 rounded-2xl border border-line/80 bg-paper p-4 shadow-(--shadow-card) transition hover:border-forest/25"
           >
             <div>
               <span className="flex size-9 items-center justify-center rounded-xl bg-forest/8 text-forest">
@@ -153,7 +153,7 @@ export function FarmerDashboard({ user }: { user: SessionUser }) {
           </Link>
           <Link
             href="/explore?for=other"
-            className="group flex items-center justify-between gap-3 rounded-2xl border border-line/80 bg-paper p-4 shadow-[var(--shadow-card)] transition hover:border-forest/25"
+            className="group flex items-center justify-between gap-3 rounded-2xl border border-line/80 bg-paper p-4 shadow-(--shadow-card) transition hover:border-forest/25"
           >
             <div>
               <span className="flex size-9 items-center justify-center rounded-xl bg-clay/10 text-clay-dark">
@@ -166,7 +166,7 @@ export function FarmerDashboard({ user }: { user: SessionUser }) {
           </Link>
           <Link
             href="/bookings"
-            className="group flex items-center justify-between gap-3 rounded-2xl border border-line/80 bg-paper p-4 shadow-[var(--shadow-card)] transition hover:border-forest/25 sm:col-span-2 lg:col-span-1"
+            className="group flex items-center justify-between gap-3 rounded-2xl border border-line/80 bg-paper p-4 shadow-(--shadow-card) transition hover:border-forest/25 sm:col-span-2 lg:col-span-1"
           >
             <div>
               <span className="flex size-9 items-center justify-center rounded-xl bg-wheat/40 text-[#7a5a1d]">

@@ -41,7 +41,7 @@ export function TractorCard({
     <Link
       href={`/tractors/${tractor.id}`}
       className={cn(
-        "group block overflow-hidden rounded-[1.4rem] border border-line/80 bg-paper shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:border-forest/25 hover:shadow-soft",
+        "group block overflow-hidden rounded-[1.4rem] border border-line/80 bg-paper shadow-(--shadow-card) transition hover:-translate-y-0.5 hover:border-forest/25 hover:shadow-soft",
         layout === "row" && "flex flex-col sm:flex-row",
         className,
       )}

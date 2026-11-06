@@ -207,7 +207,7 @@ export function BookingsScreen({ role }: { role: Role }) {
         ).map((stat) => (
           <div
             key={stat.label}
-            className="flex items-center gap-3 rounded-2xl border border-line/80 bg-paper px-3.5 py-3 shadow-[var(--shadow-card)]"
+            className="flex items-center gap-3 rounded-2xl border border-line/80 bg-paper px-3.5 py-3 shadow-(--shadow-card)"
           >
             <span className={`flex size-9 items-center justify-center rounded-xl ${stat.tone}`}>
               <stat.icon className="size-4" />

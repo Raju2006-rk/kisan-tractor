@@ -86,7 +86,7 @@ export function HelpScreen() {
             <a
               key={section.id}
               href={`#${section.id}`}
-              className="group flex items-start gap-3 rounded-2xl border border-line/80 bg-paper p-4 shadow-[var(--shadow-card)] transition hover:border-forest/25"
+              className="group flex items-start gap-3 rounded-2xl border border-line/80 bg-paper p-4 shadow-(--shadow-card) transition hover:border-forest/25"
             >
               <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-forest/8 text-forest">
                 <Icon className="size-4" />

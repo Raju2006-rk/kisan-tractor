@@ -49,7 +49,7 @@ export function BookingCard({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-[1.4rem] border border-line/80 bg-paper shadow-[var(--shadow-card)]",
+        "overflow-hidden rounded-[1.4rem] border border-line/80 bg-paper shadow-(--shadow-card)",
         compact && "rounded-2xl",
       )}
     >
