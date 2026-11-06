@@ -161,6 +161,7 @@ export type LiveLocation = {
 export type BookingLocation = {
   label: string;
   village: string;
+  pincode?: string;
   district: string;
   state: string;
   lat: number;

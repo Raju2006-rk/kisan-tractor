@@ -123,6 +123,12 @@ export function TractorOnboardingWizard({
   // Step 4: Location Entry
   const profileVillage = user?.ownerProfile?.village?.trim() ?? "";
   const [locationName, setLocationName] = useState<string>(profileVillage);
+  const [locationAddress, setLocationAddress] = useState<string>(
+    user?.ownerProfile?.address ?? "",
+  );
+  const [pincode, setPincode] = useState<string>(
+    user?.ownerProfile?.pincode ?? "",
+  );
   const [coords, setCoords] = useState(() => ({
     lat: user?.ownerProfile?.lat ?? 0,
     lng: user?.ownerProfile?.lng ?? 0,
@@ -229,12 +235,18 @@ export function TractorOnboardingWizard({
             geo.district ||
             (geo.address ? geo.address.split(",")[0].trim() : "");
           if (detected) setLocationName(detected);
+          if (geo.address) setLocationAddress(geo.address);
+          if (geo.pincode) setPincode(geo.pincode);
           if (geo.district) setDetectedDistrict(geo.district);
           if (geo.state) setDetectedState(geo.state);
           const summary = [detected, geo.district, geo.state]
             .filter(Boolean)
             .join(", ");
-          setLocationNote(summary || `${lat}, ${lng}`);
+          setLocationNote(
+            summary
+              ? `${summary}${geo.pincode ? ` (${geo.pincode})` : ""}`
+              : `${lat}, ${lng}`,
+          );
           push(t("app.tractorLocationDetected"), "success");
         } catch {
           setLocationNote(`${lat}, ${lng}`);
@@ -331,6 +343,8 @@ export function TractorOnboardingWizard({
         images: photoUrl ? [photoUrl] : undefined,
         status: "active" as const,
         village: locationName.trim(),
+        address: locationAddress.trim() || undefined,
+        pincode: pincode.trim() || undefined,
         district,
         state,
         lat,
@@ -361,26 +375,26 @@ export function TractorOnboardingWizard({
         throw new Error(data.error ?? "Could not save tractor details. Please try again.");
       }
 
-      // Also ensure owner profile documents are recorded
-      if (dlPhoto || rcPhoto) {
-        await fetch("/api/profile", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            village: locationName.trim(),
-            district,
-            state,
-            lat,
-            lng,
-            serviceRadiusKm: Number(serviceRadiusKm) || 15,
-            documents: {
-              dlPhoto: dlPhoto || null,
-              rcPhoto: rcPhoto || null,
-              rcNumber: registrationNumber.trim().toUpperCase() || null,
-            },
-          }),
-        }).catch(() => undefined);
-      }
+      // Also ensure owner profile location & documents are recorded
+      await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          village: locationName.trim(),
+          address: locationAddress.trim() || undefined,
+          pincode: pincode.trim() || undefined,
+          district,
+          state,
+          lat,
+          lng,
+          serviceRadiusKm: Number(serviceRadiusKm) || 15,
+          documents: {
+            dlPhoto: dlPhoto || null,
+            rcPhoto: rcPhoto || null,
+            rcNumber: registrationNumber.trim().toUpperCase() || null,
+          },
+        }),
+      }).catch(() => undefined);
 
       push("Tractor details saved successfully! Opening Owner Dashboard...", "success");
 
@@ -733,12 +747,35 @@ export function TractorOnboardingWizard({
       {/* Step 4: Location Entry */}
       {currentStep === "location" && (
         <div className="mt-5 space-y-5">
-          <Field label="Tractor Current Location" hint="Village / Town / Area" required>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Tractor Current Village / Town" hint="Village / Town name" required>
+              <Input
+                value={locationName}
+                onChange={(e) => setLocationName(e.target.value)}
+                placeholder="Enter your village or town name"
+                autoComplete="address-level2"
+              />
+            </Field>
+
+            <Field label="PIN Code" hint="6-digit postal code">
+              <Input
+                value={pincode}
+                onChange={(e) =>
+                  setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                }
+                placeholder="e.g. 560060"
+                maxLength={6}
+                inputMode="numeric"
+              />
+            </Field>
+          </div>
+
+          <Field label="Full Farm / House Address" hint="Door no, street, landmark, area">
             <Input
-              value={locationName}
-              onChange={(e) => setLocationName(e.target.value)}
-              placeholder="Enter your village or town name"
-              autoComplete="address-level2"
+              value={locationAddress}
+              onChange={(e) => setLocationAddress(e.target.value)}
+              placeholder="e.g. Near Panchayat Office, Main Road"
+              autoComplete="street-address"
             />
           </Field>
 

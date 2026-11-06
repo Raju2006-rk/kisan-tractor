@@ -583,6 +583,7 @@ export async function createBooking(
     serviceLocation: {
       label: string;
       village: string;
+      pincode?: string;
       district: string;
       state: string;
       lat: number;
@@ -749,6 +750,9 @@ export async function createBooking(
       serviceLocation: {
         label: safeText(input.serviceLocation.label, 200),
         village: safeText(input.serviceLocation.village, 80),
+        pincode: input.serviceLocation.pincode
+          ? safeText(input.serviceLocation.pincode, 20).replace(/\D/g, "").slice(0, 6)
+          : undefined,
         district: safeText(input.serviceLocation.district, 80),
         state: safeText(input.serviceLocation.state, 80),
         lat: input.serviceLocation.lat,
@@ -774,6 +778,34 @@ export async function createBooking(
       cancelledBy: null,
     };
     draft.bookings.push(booking);
+    const farmerProf =
+      draft.farmerProfiles.find((p) => p.userId === user.id) ??
+      ensureFarmerProfile(draft, user.id);
+    if (booking.serviceLocation.village) {
+      if (!farmerProf.village || farmerProf.village === "Demo Village") {
+        farmerProf.village = booking.serviceLocation.village;
+      }
+      if (booking.serviceLocation.district && !farmerProf.district) {
+        farmerProf.district = booking.serviceLocation.district;
+      }
+      if (booking.serviceLocation.state && !farmerProf.state) {
+        farmerProf.state = booking.serviceLocation.state;
+      }
+      if (
+        booking.serviceLocation.lat &&
+        booking.serviceLocation.lng &&
+        (!farmerProf.lat || farmerProf.lat === 0)
+      ) {
+        farmerProf.lat = booking.serviceLocation.lat;
+        farmerProf.lng = booking.serviceLocation.lng;
+      }
+    }
+    if (booking.serviceLocation.label && !farmerProf.address) {
+      farmerProf.address = booking.serviceLocation.label;
+    }
+    if (booking.serviceLocation.pincode && !farmerProf.pincode) {
+      farmerProf.pincode = booking.serviceLocation.pincode;
+    }
     addHistory(
       draft,
       booking,
@@ -1578,11 +1610,12 @@ export async function updateUserProfile(
       }
       if (input.address !== undefined) profile.address = safeText(input.address, 300);
       if (input.pincode !== undefined) {
-        const pincode = safeText(input.pincode, 10);
-        if (pincode && !/^\d{5,6}$/.test(pincode)) {
+        const raw = safeText(input.pincode, 20);
+        const digits = raw.replace(/\D/g, "");
+        if (raw.trim() && digits && !/^\d{5,6}$/.test(digits)) {
           throw new ServiceError("Please enter a valid pincode.", 400);
         }
-        profile.pincode = pincode;
+        profile.pincode = digits;
       }
       if (input.district !== undefined) profile.district = safeText(input.district, 80);
       if (input.state !== undefined) profile.state = safeText(input.state, 80);
@@ -1726,6 +1759,8 @@ export async function saveTractor(
     images?: string[];
     status?: "active" | "maintenance" | "inactive";
     village: string;
+    address?: string;
+    pincode?: string;
     district: string;
     state: string;
     lat: number;
@@ -1882,12 +1917,18 @@ export async function saveTractor(
     tractor.lng = lng;
     tractor.serviceRadiusKm = serviceRadiusKm;
     tractor.equipmentIds = validEquipment;
-    if (!ownerProfile.village && tractorVillage) {
+    if (tractorVillage) {
       ownerProfile.village = tractorVillage;
       ownerProfile.district = tractor.district;
       ownerProfile.state = tractor.state;
       ownerProfile.lat = lat;
       ownerProfile.lng = lng;
+      ownerProfile.serviceRadiusKm = serviceRadiusKm;
+      if (input.address) ownerProfile.address = safeText(input.address, 300);
+      if (input.pincode) {
+        const cleanPin = safeText(input.pincode, 20).replace(/\D/g, "").slice(0, 6);
+        if (cleanPin) ownerProfile.pincode = cleanPin;
+      }
     }
     if (input.documents) {
       const docs = ownerProfile.documents ?? {

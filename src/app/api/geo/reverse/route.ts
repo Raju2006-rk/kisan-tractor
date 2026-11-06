@@ -70,15 +70,26 @@ function googleKey(): string {
   );
 }
 
+function cleanPincode(val?: string | null): string {
+  if (!val || typeof val !== "string") return "";
+  const digits = val.replace(/\D/g, "");
+  if (digits.length >= 6) {
+    return digits.slice(0, 6);
+  }
+  if (digits.length === 5) {
+    return digits;
+  }
+  const match = val.match(/\b\d{6}\b/) || val.match(/\b\d{5}\b/);
+  return match ? match[0] : "";
+}
+
 function cleanPlaceName(val?: string | null): string {
   if (!val || typeof val !== "string") return "";
   let s = val.trim();
   // Strip Plus Code prefix (e.g. 8FW4V888+88, 7J4V+3Q, etc.)
   s = s.replace(/^[A-Z0-9]{2,8}\+[A-Z0-9]{2,4}\s*,?\s*/i, "").trim();
-  if (/[A-Z0-9]{2,8}\+[A-Z0-9]{2,4}/i.test(s)) return "";
   if (/^unnamed\s*(road|street|path|lane|gali)?$/i.test(s)) return "";
   if (/^(nh|sh|ah|state highway|national highway)\s*[-–]?\s*\d+$/i.test(s)) return "";
-  if (/^\d{3,8}$/.test(s)) return "";
   return s;
 }
 
@@ -126,7 +137,7 @@ async function reverseWithGoogle(
     let neighborhood = "";
     let district = "";
     let state = "";
-    let pincode = "";
+    let rawPincode = "";
 
     // Iterate through all Google results to find the most accurate settlement & administrative components
     for (const res of results) {
@@ -138,7 +149,7 @@ async function reverseWithGoogle(
       if (!neighborhood) neighborhood = componentOf(comps, "neighborhood");
       if (!district) district = componentOf(comps, "administrative_area_level_2", "administrative_area_level_3");
       if (!state) state = componentOf(comps, "administrative_area_level_1");
-      if (!pincode) pincode = componentOf(comps, "postal_code");
+      if (!rawPincode) rawPincode = componentOf(comps, "postal_code");
     }
 
     // Priority for Indian settlement name: locality (town/city/village) > sublocality_level_1 > admin3 (taluka/tehsil) > sublocality
@@ -146,7 +157,7 @@ async function reverseWithGoogle(
     let village = "";
     for (const cand of candidates) {
       const cleaned = cleanPlaceName(cand);
-      if (cleaned) {
+      if (cleaned && !/^\d+$/.test(cleaned)) {
         village = cleaned;
         break;
       }
@@ -154,21 +165,25 @@ async function reverseWithGoogle(
 
     const primaryResult = results[0];
     let formatted = primaryResult?.formatted_address || "";
+    if (formatted) {
+      formatted = formatted.replace(/^[A-Z0-9]{2,8}\+[A-Z0-9]{2,4}\s*,?\s*/i, "").trim();
+    }
+
+    district = cleanPlaceName(district);
+    state = cleanPlaceName(state);
+    const pincode =
+      cleanPincode(rawPincode) ||
+      (formatted.match(/\b\d{6}\b/) ? formatted.match(/\b\d{6}\b/)![0] : "");
 
     if (!village && formatted) {
       const parts = formatted.split(",").map((p) => cleanPlaceName(p)).filter(Boolean);
       for (const part of parts) {
-        if (!/^(india|bharat)$/i.test(part) && part !== state && part !== district) {
+        if (!/^(india|bharat)$/i.test(part) && part !== state && part !== district && !/^\d+$/.test(part)) {
           village = part;
           break;
         }
       }
     }
-
-    formatted = cleanPlaceName(formatted) || formatted;
-    district = cleanPlaceName(district);
-    state = cleanPlaceName(state);
-    pincode = cleanPlaceName(pincode);
 
     const address = formatted || [village, district, state, pincode].filter(Boolean).join(", ");
     if (!address && !village) return null;
@@ -229,7 +244,7 @@ async function reverseWithNominatim(
     for (const cand of candidates) {
       if (cand) {
         const cleaned = cleanPlaceName(cand);
-        if (cleaned) {
+        if (cleaned && !/^\d+$/.test(cleaned)) {
           village = cleaned;
           break;
         }
@@ -245,20 +260,25 @@ async function reverseWithNominatim(
       "",
     );
     const state = cleanPlaceName(addr.state || "");
-    const pincode = cleanPlaceName(addr.postcode || "");
+    let rawAddress = data.display_name || "";
+    if (rawAddress) {
+      rawAddress = rawAddress.replace(/^[A-Z0-9]{2,8}\+[A-Z0-9]{2,4}\s*,?\s*/i, "").trim();
+    }
+    const pincode =
+      cleanPincode(addr.postcode) ||
+      (rawAddress.match(/\b\d{6}\b/) ? rawAddress.match(/\b\d{6}\b/)![0] : "");
 
-    if (!village && data.display_name) {
-      const parts = data.display_name.split(",").map((p) => cleanPlaceName(p)).filter(Boolean);
+    if (!village && rawAddress) {
+      const parts = rawAddress.split(",").map((p) => cleanPlaceName(p)).filter(Boolean);
       for (const part of parts) {
-        if (!/^(india|bharat)$/i.test(part) && part !== state && part !== district) {
+        if (!/^(india|bharat)$/i.test(part) && part !== state && part !== district && !/^\d+$/.test(part)) {
           village = part;
           break;
         }
       }
     }
 
-    let address = data.display_name || "";
-    address = cleanPlaceName(address) || address;
+    let address = rawAddress;
     if (!address) {
       address = [village, district, state, pincode].filter(Boolean).join(", ");
     }

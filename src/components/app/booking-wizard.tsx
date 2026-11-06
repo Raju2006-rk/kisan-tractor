@@ -280,6 +280,7 @@ export function BookingWizard({
     user.farmerProfile?.district ?? "",
   );
   const [detectedState, setDetectedState] = useState(user.farmerProfile?.state ?? "");
+  const [pincode, setPincode] = useState(user.farmerProfile?.pincode ?? "");
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -395,6 +396,7 @@ export function BookingWizard({
             (geo.address ? geo.address.split(",")[0].trim() : "");
           if (detected) setVillageName(detected);
           if (geo.address) setFarmLabel(geo.address);
+          if (geo.pincode) setPincode(geo.pincode);
           if (geo.district) setDetectedDistrict(geo.district);
           if (geo.state) setDetectedState(geo.state);
           push(
@@ -655,6 +657,7 @@ export function BookingWizard({
           serviceLocation: {
             label: farmLabel.trim(),
             village: villageName.trim(),
+            pincode: pincode.trim() || undefined,
             district: detectedDistrict || selectedVillage?.district || "",
             state: detectedState || selectedVillage?.state || "",
             lat,
@@ -1233,7 +1236,18 @@ export function BookingWizard({
                       autoComplete="address-level2"
                     />
                   </Field>
-                  <Field label={t("app.farmAddress")} required>
+                  <Field label={t("app.pincode")} hint="6-digit PIN">
+                    <Input
+                      value={pincode}
+                      onChange={(event) =>
+                        setPincode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                      }
+                      placeholder="e.g. 560060"
+                      maxLength={6}
+                      inputMode="numeric"
+                    />
+                  </Field>
+                  <Field label={t("app.farmAddress")} required className="sm:col-span-2">
                     <Input
                       value={farmLabel}
                       onChange={(event) => setFarmLabel(event.target.value)}
@@ -1255,6 +1269,7 @@ export function BookingWizard({
                         {detectedDistrict || selectedVillage?.district || ""}
                         {detectedDistrict || selectedVillage?.district ? ", " : ""}
                         {detectedState || selectedVillage?.state || ""}
+                        {pincode ? ` (${pincode})` : ""}
                       </span>
                     </>
                   )}

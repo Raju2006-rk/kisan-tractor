@@ -10,35 +10,50 @@ import { cn } from "@/lib/utils";
 
 const emptySubscribe = () => () => {};
 
-function getLangSelectedSnapshot(): boolean {
-  if (typeof window === "undefined") return true;
+function getSessionUnlockedSnapshot(): boolean {
+  if (typeof window === "undefined") return false;
   try {
-    const fromStorage = window.localStorage.getItem("kt_lang_selected");
-    if (fromStorage === "true") return true;
-    const cookieMatch = document.cookie.match(/(?:^|;\s*)kt_lang_selected=([^;]*)/);
-    return Boolean(cookieMatch && cookieMatch[1] === "1");
+    return window.sessionStorage.getItem("kt_lang_session_unlocked") === "1";
   } catch {
     return false;
   }
 }
 
+function getServerSnapshot(): boolean {
+  return false;
+}
+
 export function LanguageGateway({
   initiallySelected = false,
 }: {
-  /** Server cookie value so first-time visitors get the gate without a flash. */
+  /** Server cookie value */
   initiallySelected?: boolean;
 }) {
+  // Reference initiallySelected to indicate it's acknowledged
+  void initiallySelected;
   const { language, setLanguage } = useI18n();
-  const isSelectedInStorage = useSyncExternalStore(
+  const isSessionUnlocked = useSyncExternalStore(
     emptySubscribe,
-    getLangSelectedSnapshot,
-    () => initiallySelected,
+    getSessionUnlockedSnapshot,
+    getServerSnapshot,
   );
-
   const [hasConfirmed, setHasConfirmed] = useState(false);
-  const [selectedLang, setSelectedLang] = useState<Language>(language);
+  const [selectedLang, setSelectedLang] = useState<Language>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedLang = window.localStorage.getItem("kt_lang");
+        if (savedLang && LANGUAGES.some((l) => l.code === savedLang)) {
+          return savedLang as Language;
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return language;
+  });
 
-  const isVisible = !isSelectedInStorage && !hasConfirmed;
+  // When opening website/app, language selection must display first, and app only opens after confirmation.
+  const isVisible = !isSessionUnlocked && !hasConfirmed;
 
   useEffect(() => {
     if (!isVisible) return;
@@ -62,10 +77,16 @@ export function LanguageGateway({
     });
   }, []);
 
+  function handleSelect(code: Language) {
+    setSelectedLang(code);
+    setLanguage(code);
+  }
+
   function confirmLanguage() {
     setLanguage(selectedLang);
     if (typeof window !== "undefined") {
       try {
+        window.sessionStorage.setItem("kt_lang_session_unlocked", "1");
         window.localStorage.setItem("kt_lang_selected", "true");
         window.localStorage.setItem("kt_lang", selectedLang);
         document.cookie = `kt_lang_selected=1; path=/; max-age=31536000; samesite=lax`;
@@ -84,7 +105,7 @@ export function LanguageGateway({
       role="dialog"
       aria-modal="true"
       aria-labelledby="language-dialog-title"
-      className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto bg-stone-900/85 p-3 sm:p-5 backdrop-blur-md"
+      className="fixed inset-0 z-[99999] flex items-center justify-center overflow-y-auto bg-stone-950/90 p-3 sm:p-5 backdrop-blur-lg"
     >
       <div className="relative my-auto flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-line bg-paper shadow-2xl">
         {/* Top banner */}
@@ -103,7 +124,7 @@ export function LanguageGateway({
             अपनी भाषा चुनें · ನಿಮ್ಮ ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ · మీ భాషను ఎంచుకోండి
           </p>
           <p className="mt-0.5 text-[0.7rem] text-stone/80">
-            Select your preferred language to open and explore the app
+            Select your preferred language to open and enter the app
           </p>
         </div>
 
@@ -116,9 +137,10 @@ export function LanguageGateway({
                 <button
                   key={lang.code}
                   type="button"
-                  onClick={() => setSelectedLang(lang.code)}
+                  onClick={() => handleSelect(lang.code)}
+                  onDoubleClick={confirmLanguage}
                   className={cn(
-                    "group relative flex flex-col items-start justify-between rounded-2xl border p-3.5 text-left transition-all duration-150",
+                    "group relative flex flex-col items-start justify-between rounded-2xl border p-3.5 text-left transition-all duration-150 cursor-pointer",
                     active
                       ? "border-forest bg-forest/[0.08] text-forest shadow-sm ring-2 ring-forest/30"
                       : "border-line bg-sand/30 text-ink hover:border-forest/30 hover:bg-sand/60",
@@ -152,12 +174,12 @@ export function LanguageGateway({
         <div className="flex flex-col items-center justify-between gap-3 border-t border-line/80 bg-paper px-6 py-4 sm:flex-row sm:px-8">
           <div className="flex items-center gap-2 text-xs text-stone">
             <Globe2 className="size-4 text-forest" />
-            <span>You can change the language anytime from settings</span>
+            <span>Select language to open KisanTractor</span>
           </div>
           <button
             type="button"
             onClick={confirmLanguage}
-            className="btn-shine flex h-11 w-full items-center justify-center gap-2 rounded-full bg-forest px-6 text-sm font-semibold text-cream shadow-[0_10px_24px_-14px_rgba(22,59,42,0.9)] transition hover:bg-forest-600 sm:w-auto"
+            className="btn-shine flex h-11 w-full items-center justify-center gap-2 rounded-full bg-forest px-6 text-sm font-semibold text-cream shadow-[0_10px_24px_-14px_rgba(22,59,42,0.9)] transition hover:bg-forest-600 sm:w-auto cursor-pointer"
           >
             <span>Continue / आगे बढ़ें</span>
             <ArrowRight className="size-4" />
@@ -167,4 +189,3 @@ export function LanguageGateway({
     </div>
   );
 }
-

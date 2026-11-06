@@ -250,6 +250,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
   const [formCoords, setFormCoords] = useState(() => profileCoords(user));
   const [formDistrict, setFormDistrict] = useState<string>(() => user.ownerProfile?.district ?? "");
   const [formState, setFormState] = useState<string>(() => user.ownerProfile?.state ?? "");
+  const [formPincode, setFormPincode] = useState<string>(() => user.ownerProfile?.pincode ?? "");
+  const [formAddress, setFormAddress] = useState<string>(() => user.ownerProfile?.address ?? "");
   const [locating, setLocating] = useState(false);
   const [formLocationError, setFormLocationError] = useState<string | null>(null);
   const [formLocationNote, setFormLocationNote] = useState<string | null>(null);
@@ -275,6 +277,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
     setFormCoords(userCoords);
     setFormDistrict(user.ownerProfile?.district ?? "");
     setFormState(user.ownerProfile?.state ?? "");
+    setFormPincode(user.ownerProfile?.pincode ?? "");
+    setFormAddress(user.ownerProfile?.address ?? "");
     setFormLocationError(null);
     setFormLocationNote(null);
   }
@@ -374,6 +378,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
             near?.name ||
             "";
           if (detected) update("village", detected);
+          if (geo.address) setFormAddress(geo.address);
+          if (geo.pincode) setFormPincode(geo.pincode);
           const district = geo.district || near?.district || "";
           const state = geo.state || near?.state || "";
           if (district) setFormDistrict(district);
@@ -381,7 +387,7 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
           const summary = [detected, district, state].filter(Boolean).join(", ");
           setFormLocationNote(
             summary
-              ? t("app.locationAddressFound", { summary })
+              ? `${summary}${geo.pincode ? ` (${geo.pincode})` : ""}`
               : t("app.tractorCoordinates", { coords: `${lat}, ${lng}` }),
           );
           push(t("app.tractorLocationDetected"), "success");
@@ -614,6 +620,8 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
         images: form.images.length ? form.images : form.image ? [form.image] : undefined,
         status: form.status,
         village,
+        address: formAddress.trim() || undefined,
+        pincode: formPincode.trim() || undefined,
         district,
         state,
         lat,
@@ -1220,6 +1228,24 @@ export function OwnerTractorScreen({ user }: { user: SessionUser }) {
                       onChange={(event) => changeVillageSelection(event.target.value)}
                       placeholder={t("app.villagePlaceholder")}
                       autoComplete="address-level2"
+                    />
+                  </Field>
+                  <Field label={t("app.pincode")} hint="6-digit PIN">
+                    <Input
+                      value={formPincode}
+                      onChange={(event) =>
+                        setFormPincode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                      }
+                      placeholder="e.g. 560060"
+                      maxLength={6}
+                      inputMode="numeric"
+                    />
+                  </Field>
+                  <Field label={t("app.address")} className="sm:col-span-2">
+                    <Input
+                      value={formAddress}
+                      onChange={(event) => setFormAddress(event.target.value)}
+                      placeholder={t("app.addressPlaceholder")}
                     />
                   </Field>
                   <Field label={t("app.serviceRadius")} hint="1–50 km">
