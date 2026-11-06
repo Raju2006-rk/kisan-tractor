@@ -324,7 +324,7 @@ export function ProfileScreen({ user }: { user: SessionUser }) {
         <div className="space-y-4">
           <Card className="overflow-hidden">
             <div className="flex flex-wrap items-center gap-4 border-b border-line/80 bg-[linear-gradient(120deg,#eaf0e4,#f3ecd9)] px-5 py-5">
-              <Avatar name={user.name} size="lg" className="!size-16 !text-xl" />
+              <Avatar name={user.name} size="lg" className="size-16! text-xl!" />
               <div className="min-w-0 flex-1">
                 <h2 className="font-display text-2xl text-forest">{user.name}</h2>
                 <p className="mt-0.5 text-xs text-stone">
