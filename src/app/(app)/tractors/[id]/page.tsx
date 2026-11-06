@@ -1,8 +1,9 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { getTractorDetail, ServiceError } from "@/lib/booking-service";
 import { TractorDetailScreen } from "@/components/app/tractor-detail-screen";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Tractor details" };
 
 export default async function TractorDetailPage({
@@ -18,7 +19,9 @@ export default async function TractorDetailPage({
   try {
     tractor = await getTractorDetail(id, user.id);
   } catch (error) {
-    if (error instanceof ServiceError && error.status === 404) notFound();
+    if (error instanceof ServiceError && error.status === 404) {
+      redirect("/explore");
+    }
     throw error;
   }
 

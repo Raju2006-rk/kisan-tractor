@@ -8,8 +8,11 @@ import {
   ArrowRight,
   Check,
   LockKeyhole,
+  LocateFixed,
+  MapPin,
   ShieldCheck,
   Smartphone,
+  Sprout,
   Tractor,
   UserRound,
 } from "lucide-react";
@@ -21,10 +24,10 @@ import { useToast } from "@/components/providers/app-providers";
 import { PHOTOS } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 import type { Role, SessionUser } from "@/lib/types";
-import { cn, maskMobile, mobileEnding } from "@/lib/utils";
+import { cn, maskMobile, mobileEnding, reverseGeocode } from "@/lib/utils";
 import { TractorOnboardingWizard } from "@/components/app/tractor-onboarding-wizard";
 
-type Step = "mobile" | "otp" | "tractor_onboarding";
+type Step = "mobile" | "otp" | "farmer_onboarding" | "tractor_onboarding";
 
 export function AuthScreen({ initialRole }: { initialRole: Role }) {
   const router = useRouter();
@@ -126,6 +129,7 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
         user?: SessionUser;
         role?: Role;
         hasTractor?: boolean;
+        hasFarmerDetails?: boolean;
       };
       if (!response.ok) {
         throw new Error(
@@ -137,13 +141,19 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
 
       const activeRole = data.role ?? role;
 
-      // 3. Farmer Login:
-      // Farmers log in using mobile number and OTP.
-      // Upon successful verification, directly redirect to farmer dashboard.
-      // Farmers should not have access to any tractor registration details.
+      // 1. Farmer Login & Registration:
+      // If farmer already has details saved in storage -> directly go to dashboard.
+      // If first-time farmer -> fill farmer registration details (Name, Address, Auto-detect GPS)
       if (activeRole === "farmer") {
-        router.push("/dashboard");
-        router.refresh();
+        if (data.hasFarmerDetails) {
+          push(t("auth.welcomeBack"), "success");
+          router.push("/dashboard");
+          router.refresh();
+          return;
+        }
+        setAuthenticatedUser(data.user ?? null);
+        setName(data.user?.name ?? "");
+        setStep("farmer_onboarding");
         return;
       }
 
@@ -178,6 +188,29 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
     { id: "farmer", title: t("auth.farmer"), body: t("auth.farmerBody"), icon: UserRound },
     { id: "owner", title: t("auth.owner"), body: t("auth.ownerBody"), icon: Tractor },
   ];
+
+  if (step === "farmer_onboarding") {
+    return (
+      <div className="min-h-dvh bg-cream px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-xl">
+          <div className="mb-6 flex items-center justify-between">
+            <Logo />
+            <div className="flex items-center gap-2">
+              <LanguageSwitcher />
+            </div>
+          </div>
+          <FarmerOnboardingView
+            user={authenticatedUser}
+            initialName={name}
+            onCompleted={() => {
+              router.push("/dashboard");
+              router.refresh();
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (step === "tractor_onboarding") {
     return (
@@ -297,14 +330,15 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
                 </div>
               </Field>
 
-              {!isExisting ? (
-                <Field label={t("auth.nameLabel")} hint={t("auth.nameHint")} htmlFor="name">
+              {role === "owner" && !isExisting ? (
+                <Field label={t("auth.nameLabel")} hint={t("auth.nameHint")} htmlFor="name" required>
                   <Input
                     id="name"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     placeholder={t("auth.namePlaceholder")}
                     autoComplete="name"
+                    required
                   />
                 </Field>
               ) : null}
@@ -345,7 +379,7 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
                 </button>
               </div>
 
-              {!isExisting ? (
+              {role === "owner" && !isExisting && !name ? (
                 <Field label={t("auth.nameLabel")} hint={t("auth.nameHint")} htmlFor="name-otp">
                   <Input
                     id="name-otp"
@@ -472,6 +506,230 @@ export function AuthScreen({ initialRole }: { initialRole: Role }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function FarmerOnboardingView({
+  user,
+  initialName,
+  onCompleted,
+}: {
+  user: SessionUser | null;
+  initialName: string;
+  onCompleted: () => void;
+}) {
+  const { t } = useI18n();
+  const { push } = useToast();
+  const [name, setName] = useState(initialName || user?.name || "");
+  const [village, setVillage] = useState(user?.farmerProfile?.village ?? "");
+  const [address, setAddress] = useState(user?.farmerProfile?.address ?? "");
+  const [pincode, setPincode] = useState(user?.farmerProfile?.pincode ?? "");
+  const [district, setDistrict] = useState(user?.farmerProfile?.district ?? "");
+  const [state, setState] = useState(user?.farmerProfile?.state ?? "");
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    user?.farmerProfile?.lat && user?.farmerProfile?.lng
+      ? { lat: user.farmerProfile.lat, lng: user.farmerProfile.lng }
+      : null,
+  );
+  const [locating, setLocating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [detectedSummary, setDetectedSummary] = useState<string | null>(null);
+
+  async function handleAutoDetect() {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      setError("Geolocation is not supported by your browser");
+      return;
+    }
+    setError(null);
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const lat = Number(pos.coords.latitude.toFixed(6));
+          const lng = Number(pos.coords.longitude.toFixed(6));
+          setCoords({ lat, lng });
+          const geo = await reverseGeocode(lat, lng);
+          if (geo.village) setVillage(geo.village);
+          if (geo.pincode) setPincode(geo.pincode);
+          if (geo.district) setDistrict(geo.district);
+          if (geo.state) setState(geo.state);
+          if (geo.address) setAddress(geo.address);
+          setDetectedSummary(
+            [geo.village, geo.district, geo.pincode].filter(Boolean).join(", ") ||
+              `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+          );
+          push(t("app.profileUpdated") || "Location auto-detected!", "success");
+        } catch {
+          setError("Failed to fetch address from location. Please enter your village manually.");
+        } finally {
+          setLocating(false);
+        }
+      },
+      () => {
+        setLocating(false);
+        setError("Location permission denied or unavailable. Please type your village.");
+      },
+      { timeout: 12000, enableHighAccuracy: true },
+    );
+  }
+
+  async function handleSave(e: SyntheticEvent) {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError("Please enter your name.");
+      return;
+    }
+    if (!village.trim()) {
+      setError("Please enter your village or town.");
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          village: village.trim(),
+          address: address.trim() || village.trim(),
+          pincode: pincode.trim(),
+          district: district.trim(),
+          state: state.trim(),
+          lat: coords?.lat,
+          lng: coords?.lng,
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? "Failed to save profile");
+      }
+      push(t("app.profileSaved"), "success");
+      onCompleted();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save farmer registration.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-3xl border border-line bg-paper p-6 shadow-soft sm:p-8">
+      <div className="flex items-center gap-3">
+        <span className="flex size-11 items-center justify-center rounded-2xl bg-forest/8 text-forest">
+          <Sprout className="size-6" />
+        </span>
+        <div>
+          <Badge tone="green" dot>
+            Farmer Registration
+          </Badge>
+          <h2 className="mt-1 font-display text-2xl text-forest">Register Your Profile</h2>
+        </div>
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-stone">
+        Please fill in your name and location details to connect with nearby tractor owners and start booking.
+      </p>
+
+      {error ? (
+        <Alert tone="danger" className="mt-4">
+          {error}
+        </Alert>
+      ) : null}
+
+      <form onSubmit={handleSave} className="mt-6 space-y-4">
+        <Field label="Full Name" htmlFor="farmer-name" required>
+          <Input
+            id="farmer-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Ramesh Kumar"
+            autoComplete="name"
+            required
+          />
+        </Field>
+
+        <div className="rounded-2xl border border-line/70 bg-cream/40 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-forest">Auto-Detect Farm Location</p>
+              <p className="text-[0.65rem] text-stone">Use your current GPS coordinates to fill village and PIN</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              loading={locating}
+              onClick={handleAutoDetect}
+              className="gap-1.5 shrink-0"
+            >
+              <LocateFixed className="size-3.5" />
+              {locating ? "Locating..." : "Auto-Detect"}
+            </Button>
+          </div>
+          {detectedSummary ? (
+            <div className="mt-2.5 flex items-center gap-1.5 rounded-xl bg-forest/8 px-3 py-1.5 text-xs font-medium text-forest">
+              <MapPin className="size-3.5 shrink-0" />
+              <span>Detected: {detectedSummary}</span>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Village / Town" htmlFor="farmer-village" required>
+            <Input
+              id="farmer-village"
+              value={village}
+              onChange={(e) => setVillage(e.target.value)}
+              placeholder="e.g. Doddabele"
+              required
+            />
+          </Field>
+          <Field label="PIN Code" htmlFor="farmer-pincode">
+            <Input
+              id="farmer-pincode"
+              inputMode="numeric"
+              maxLength={6}
+              value={pincode}
+              onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="e.g. 560060"
+            />
+          </Field>
+        </div>
+
+        <Field label="Farm Address / Landmark" htmlFor="farmer-address">
+          <Input
+            id="farmer-address"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="e.g. Near Old Temple, Post Doddabele"
+          />
+        </Field>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="District" htmlFor="farmer-district">
+            <Input
+              id="farmer-district"
+              value={district}
+              onChange={(e) => setDistrict(e.target.value)}
+              placeholder="e.g. Bangalore Rural"
+            />
+          </Field>
+          <Field label="State" htmlFor="farmer-state">
+            <Input
+              id="farmer-state"
+              value={state}
+              onChange={(e) => setState(e.target.value)}
+              placeholder="e.g. Karnataka"
+            />
+          </Field>
+        </div>
+
+        <Button type="submit" size="lg" className="w-full mt-2" loading={saving}>
+          Save & Go to Dashboard <ArrowRight className="size-4" />
+        </Button>
+      </form>
     </div>
   );
 }

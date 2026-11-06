@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { BookingWizard } from "@/components/app/booking-wizard";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Book a tractor" };
 
 export default async function BookPage({
@@ -11,7 +12,6 @@ export default async function BookPage({
 }) {
   const user = await getSessionUser();
   if (!user) redirect("/auth");
-  if (user.role !== "farmer") redirect("/dashboard");
   const params = searchParams ? await searchParams : undefined;
 
   return (

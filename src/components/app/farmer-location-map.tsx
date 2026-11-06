@@ -48,7 +48,7 @@ export default function FarmerLocationMap({
       ) : (
         <LeafletFarmerLocationMap farm={farm} farmer={farmer} />
       )}
-      <div className="pointer-events-none absolute left-2.5 top-2.5 z-[500] flex flex-wrap items-center gap-2 rounded-full border border-forest/10 bg-paper/95 px-2.5 py-1 text-[0.6rem] font-semibold text-forest shadow-sm backdrop-blur">
+      <div className="pointer-events-none absolute left-2.5 top-2.5 z-500 flex flex-wrap items-center gap-2 rounded-full border border-forest/10 bg-paper/95 px-2.5 py-1 text-[0.6rem] font-semibold text-forest shadow-sm backdrop-blur">
         <span className="inline-flex items-center gap-1">
           <span className="size-1.5 rounded-full bg-forest" /> {t("app.farmLand")}
         </span>

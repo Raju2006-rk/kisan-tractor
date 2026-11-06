@@ -86,10 +86,17 @@ export async function POST(request: Request) {
     await rememberDevice(user);
 
     const fresh = await getDb();
-    const profile =
-      fresh.farmerProfiles.find((p) => p.userId === user.id) ??
-      fresh.ownerProfiles.find((p) => p.userId === user.id);
+    const farmerProf = fresh.farmerProfiles.find((p) => p.userId === user.id);
+    const ownerProf = fresh.ownerProfiles.find((p) => p.userId === user.id);
+    const profile = user.role === "owner" ? ownerProf : farmerProf;
     const hasTractor = fresh.tractors.some((t) => t.ownerId === user.id);
+    const hasFarmerDetails = Boolean(
+      farmerProf &&
+      farmerProf.village &&
+      farmerProf.village !== "Demo Village" &&
+      user.name &&
+      user.name.trim().length >= 2,
+    );
 
     return NextResponse.json({
       ok: true,
@@ -97,6 +104,7 @@ export async function POST(request: Request) {
       isNew,
       role: user.role,
       hasTractor,
+      hasFarmerDetails,
       user: { ...user, profile },
     });
   } catch (error) {

@@ -1,8 +1,9 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { getBookingDetail, ServiceError } from "@/lib/booking-service";
 import { BookingDetailScreen } from "@/components/app/booking-detail-screen";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Booking details" };
 
 export default async function BookingDetailPage({
@@ -17,9 +18,10 @@ export default async function BookingDetailPage({
   try {
     await getBookingDetail(id, user.id);
   } catch (error) {
-    if (error instanceof ServiceError && error.status === 404) notFound();
-    if (error instanceof ServiceError && error.status === 403) redirect("/bookings");
-    throw error;
+    if (error instanceof ServiceError && (error.status === 404 || error.status === 403)) {
+      redirect("/bookings");
+    }
+    redirect("/bookings");
   }
 
   return <BookingDetailScreen bookingId={id} role={user.role} />;

@@ -52,9 +52,61 @@ export async function POST(request: Request) {
       return jsonError("Please choose whether you are a farmer or tractor owner.", 400);
     }
 
-    // A returning user must still type the name saved for this mobile number.
-    // This blocks signing into an account with someone else's name or a phone
-    // number that does not belong to the stored account.
+    // 1. Farmer Second-Time Login Flow:
+    // If farmer has already registered their data in storage, directly log in to dashboard without OTP.
+    if (existing && existing.role === "farmer") {
+      const farmerProfile = db.farmerProfiles.find((p) => p.userId === existing.id);
+      const hasFarmerData = Boolean(
+        farmerProfile &&
+        farmerProfile.village &&
+        farmerProfile.village !== "Demo Village" &&
+        existing.name &&
+        existing.name.trim().length >= 2,
+      );
+      if (hasFarmerData) {
+        await createSession(existing.id);
+        await rememberDevice(existing);
+        return NextResponse.json({
+          ok: true,
+          signedIn: true,
+          isNew: false,
+          mobile,
+          role: "farmer",
+          name: existing.name,
+        });
+      }
+    }
+
+    // 2. Tractor Owner Subsequent Login Flow:
+    // When a registered tractor owner enters their mobile and name, if their details and tractor exist in storage,
+    // directly redirect to owner dashboard.
+    if (existing && existing.role === "owner") {
+      const hasTractor = db.tractors.some((t) => t.ownerId === existing.id);
+      const cleanProvided = providedName.toLowerCase().trim();
+      const cleanStored = existing.name.toLowerCase().trim();
+      const ownerNameMatches = Boolean(
+        cleanProvided &&
+        (cleanStored === cleanProvided ||
+          cleanStored.includes(cleanProvided) ||
+          cleanProvided.includes(cleanStored)),
+      );
+
+      if (hasTractor && ownerNameMatches) {
+        await createSession(existing.id);
+        await rememberDevice(existing);
+        return NextResponse.json({
+          ok: true,
+          signedIn: true,
+          isNew: false,
+          mobile,
+          role: "owner",
+          hasTractor: true,
+          name: existing.name,
+        });
+      }
+    }
+
+    // A returning user must still type the name saved for this mobile number if providing name.
     const identity = await validateStoredIdentity(mobile, providedName);
     if (!identity.ok) {
       return NextResponse.json(
@@ -63,8 +115,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // A browser that already completed an OTP for this exact account is
-    // trusted, so a returning user only has to enter their phone number.
+    // A browser that already completed an OTP on this trusted device
     if (existing && (await isTrustedDevice(existing.id, mobile))) {
       await createSession(existing.id);
       await rememberDevice(existing);
