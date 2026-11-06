@@ -126,7 +126,7 @@ export function TractorDetailScreen({
             <Photo
               src={tractor.image}
               alt={`${tractor.brand} ${tractor.model}`}
-              className="aspect-[16/10] w-full"
+              className=" w-full"
               sizes="(max-width: 1024px) 100vw, 62vw"
               priority
             />
@@ -154,7 +154,7 @@ export function TractorDetailScreen({
                   key={`${image}-${index}`}
                   src={image}
                   alt={`${tractor.brand} ${tractor.model} photo ${index + 1}`}
-                  className="aspect-[4/3] w-full rounded-2xl border border-line"
+                  className="aspect-4/3 w-full rounded-2xl border border-line"
                   sizes="(max-width: 1024px) 33vw, 20vw"
                 />
               ))}
